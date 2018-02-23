@@ -66,7 +66,7 @@ func New(prefix string, items []string) *Menu {
 	}
 
 	self.Input = func() string {
-		return fmt.Sprintf("%s %s", prefix, input)
+		return fmt.Sprintf("%s%s", prefix, input)
 	}
 
 	self.Position = func() int {
