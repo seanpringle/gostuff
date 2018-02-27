@@ -1,5 +1,9 @@
 package box
 
+import (
+	"image"
+)
+
 const (
 	Left = iota
 	Right
@@ -26,6 +30,10 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (self Box) Rect() image.Rectangle {
+	return image.Rect(self.X, self.Y, self.X+self.W, self.Y+self.H)
 }
 
 // Extract X,Y,W,H
@@ -70,26 +78,12 @@ func (self Box) Hsplit() (Box, Box) {
 
 // Are boxes equal? Go can also just == the structs
 func (self Box) Equal(b Box) bool {
-	a := self
-	ax, ay, aw, ah := a.Unpack()
-	bx, by, bw, bh := b.Unpack()
-	return ax == bx && aw == bw && ay == by && ah == bh
+	return self.Rect().Eq(b.Rect())
 }
 
 // Do boxes intersect in any direction?
 func (self Box) Intersects(b Box) bool {
-	a := self
-	ax, ay, aw, ah := a.Unpack()
-	bx, by, bw, bh := b.Unpack()
-
-	within := func(a, b, c int) bool {
-		return c >= a && c < b
-	}
-
-	overlapX := within(ax, ax+aw, bx) || within(ax, ax+aw, bx+bw-1) || within(bx, bx+bw, ax) || within(bx, bx+bw, ax+aw-1)
-	overlapY := within(ay, ay+ah, by) || within(ay, ay+ah, by+bh-1) || within(by, by+bh, ay) || within(by, by+bh, ay+ah-1)
-
-	return overlapX && overlapY
+	return !self.Rect().Intersect(b.Rect()).Empty()
 }
 
 // Are boxes adjacent with one side touching?
@@ -116,30 +110,13 @@ func (self Box) Adjacent(b Box) bool {
 
 // Is a box entirely contained within another?
 func (self Box) Contains(b Box) bool {
-	a := self
-	if !a.Intersects(b) {
-		return false
-	}
-	bx, by, bw, bh := b.Unpack()
-	tl := a.Intersects(Box{bx, by, 1, 1})
-	tr := a.Intersects(Box{bx + bw - 1, by, 1, 1})
-	bl := a.Intersects(Box{bx, by + bh - 1, 1, 1})
-	br := a.Intersects(Box{bx + bw - 1, by + bh - 1, 1, 1})
-
-	return tl && tr && bl && br
+	return b.Rect().In(self.Rect())
 }
 
 // Bounding box
 func (self Box) Union(b Box) Box {
-	a := self
-	ax, ay, aw, ah := a.Unpack()
-	bx, by, bw, bh := b.Unpack()
-	return Box{
-		X: min(ax, bx),
-		Y: min(ay, by),
-		W: max(ax+aw, bx+bw) - min(ax, bx),
-		H: max(ay+ah, by+bh) - min(ay, by),
-	}
+	r := self.Rect().Union(b.Rect())
+	return Box{r.Min.X, r.Min.Y, r.Dx(), r.Dy()}
 }
 
 // X,Y of center point
