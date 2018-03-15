@@ -7,23 +7,45 @@ import (
 
 type Maze [10][10]int
 
-func (m Maze) Diagonal() bool {
-	return true
+type Cell struct {
+	X, Y int
+	maze Maze
 }
 
-func (m Maze) Traversable(p Point) (ok bool) {
-	defer func() { recover() }()
-	ok = m[p.X][p.Y] == 0
-	return
+func (c Cell) Neighbours() []Node {
+	var cells []Node
+	tryXY := func(x, y int) {
+		cn := Cell{X: x, Y: y, maze: c.maze}
+		if c.maze.Traversable(cn) {
+			cells = append(cells, cn)
+		}
+	}
+	tryXY(c.X-1, c.Y-1)
+	tryXY(c.X-1, c.Y+0)
+	tryXY(c.X-1, c.Y+1)
+
+	tryXY(c.X+0, c.Y-1)
+	tryXY(c.X+0, c.Y+1)
+
+	tryXY(c.X+1, c.Y-1)
+	tryXY(c.X+1, c.Y+0)
+	tryXY(c.X+1, c.Y+1)
+	return cells
 }
 
-func (m Maze) HeuristicCostEstimate(a, b Point) float64 {
-	dx := math.Abs(float64(b.X - a.X))
-	dy := math.Abs(float64(b.Y - a.Y))
+func (c Cell) HeuristicCostEstimate(t Node) float64 {
+	dx := math.Abs(float64(t.(Cell).X - c.X))
+	dy := math.Abs(float64(t.(Cell).Y - c.Y))
 	return math.Sqrt(dx*dx + dy*dy)
 }
 
-func (m Maze) Validate(path []Point) bool {
+func (m Maze) Traversable(c Node) (ok bool) {
+	defer func() { recover() }()
+	ok = m[c.(Cell).X][c.(Cell).Y] == 0
+	return
+}
+
+func (m Maze) Validate(path []Node) bool {
 	for _, p := range path {
 		if !m.Traversable(p) {
 			return false
@@ -32,7 +54,7 @@ func (m Maze) Validate(path []Point) bool {
 	return true
 }
 
-func (m Maze) Draw(test *testing.T, path []Point) {
+func (m Maze) Draw(test *testing.T, path []Node) {
 	dump := ""
 	for x := 0; x < 10; x++ {
 		dump += "\n"
@@ -40,7 +62,7 @@ func (m Maze) Draw(test *testing.T, path []Point) {
 			wall := m[x][y] == 1
 			used := false
 			for _, p := range path {
-				if p == (Point{x, y}) {
+				if p == (Cell{x, y, m}) {
 					used = true
 				}
 			}
@@ -70,10 +92,14 @@ func TestSearch(test *testing.T) {
 	maze[5][5] = 1
 	maze[5][6] = 1
 	maze[5][7] = 1
-	maze[5][8] = 1
-	path := Search(maze, Point{1, 1}, Point{8, 8})
-	maze.Draw(test, path)
+	path := Search(Cell{2, 2, maze}, Cell{8, 8, maze})
 	if !maze.Validate(path) {
 		test.Errorf("path crosses walls")
 	}
+	maze.Draw(test, path)
+	path = Search(Cell{2, 2, maze}, Cell{5, 5, maze})
+	if path != nil {
+		test.Errorf("impossible path")
+	}
+	maze.Draw(test, path)
 }

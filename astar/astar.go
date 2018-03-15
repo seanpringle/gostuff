@@ -4,70 +4,61 @@ import (
 	"math"
 )
 
-type Point struct {
-	X, Y int
+type Node interface {
+	Neighbours() []Node
+	HeuristicCostEstimate(Node) float64
 }
 
-type Pathable interface {
-	Diagonal() bool
-	Traversable(Point) bool
-	HeuristicCostEstimate(Point, Point) float64
-}
-
-type navNode struct {
-	pt             Point
+type marker struct {
 	gScore, fScore float64
-	cameFrom       *navNode
+	cameFrom       *marker
+	node           Node
 }
 
-type navNodeSet map[*navNode]struct{}
+type markers map[*marker]struct{}
 
-func (ns navNodeSet) Add(node *navNode) {
+func (ns markers) Add(node *marker) {
 	ns[node] = struct{}{}
 }
 
-func (ns navNodeSet) Drop(node *navNode) {
+func (ns markers) Drop(node *marker) {
 	delete(ns, node)
 }
 
-func (ns navNodeSet) Has(node *navNode) bool {
+func (ns markers) Has(node *marker) bool {
 	_, has := ns[node]
 	return has
 }
 
-func Search(cb Pathable, src, dst Point) []Point {
-
-	diagonal := cb.Diagonal()
+func Search(src, dst Node) []Node {
 
 	inf := math.Inf(+1)
-	nodes := make(map[Point]*navNode)
+	nodes := map[Node]*marker{}
 
-	node := func(pt Point) *navNode {
-		if _, exists := nodes[pt]; !exists {
-			nodes[pt] = &navNode{
-				pt:       pt,
+	node := func(n Node) *marker {
+		if _, exists := nodes[n]; !exists {
+			nodes[n] = &marker{
 				gScore:   inf,
 				fScore:   inf,
 				cameFrom: nil,
+				node:     n,
 			}
 		}
-		return nodes[pt]
+		return nodes[n]
 	}
 
-	closedSet := navNodeSet{}
-	openSet := navNodeSet{}
+	closedSet := markers{}
+	openSet := markers{}
 
 	start := node(src)
 	start.gScore = 0
-	start.fScore = cb.HeuristicCostEstimate(src, dst)
+	start.fScore = start.node.HeuristicCostEstimate(dst)
 
 	openSet.Add(start)
 
-	var path []*navNode
+	for len(openSet) > 0 {
 
-	for path == nil && len(openSet) > 0 {
-
-		var current *navNode
+		var current *marker
 
 		for candidate, _ := range openSet {
 			if current == nil || candidate.fScore < current.fScore {
@@ -75,61 +66,43 @@ func Search(cb Pathable, src, dst Point) []Point {
 			}
 		}
 
-		if current.pt == dst {
+		if current.node == dst {
 
-			path = []*navNode{current}
+			var nodes []Node
+
 			for current.cameFrom != nil {
+				nodes = append(nodes, current.node)
 				current = current.cameFrom
-				path = append(path, current)
 			}
-			for i := 0; i < len(path)/2; i++ {
-				tmp := path[i]
-				path[i] = path[len(path)-i-1]
-				path[len(path)-i-1] = tmp
+
+			nodes = append(nodes, src)
+
+			for i, j := 0, len(nodes)-1; i < j; i, j = i+1, j-1 {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
 			}
+
+			return nodes
 
 		} else {
 
 			openSet.Drop(current)
 			closedSet.Add(current)
 
-			neighborCheck := func(pt Point) {
-				neighbor := node(pt)
-				// neighbor is obstacle?
-				if !closedSet.Has(neighbor) && neighbor.pt != dst && !cb.Traversable(neighbor.pt) {
-					closedSet.Add(neighbor)
-				}
-				if !closedSet.Has(neighbor) {
-					gScoreTentative := current.gScore + cb.HeuristicCostEstimate(current.pt, neighbor.pt)
+			for _, n := range current.node.Neighbours() {
+				neighbour := node(n)
+				if !closedSet.Has(neighbour) {
+					gScoreTentative := current.gScore + current.node.HeuristicCostEstimate(neighbour.node)
 
-					if !openSet.Has(neighbor) || gScoreTentative < neighbor.gScore {
-						neighbor.cameFrom = current
-						neighbor.gScore = gScoreTentative
-						neighbor.fScore = gScoreTentative + cb.HeuristicCostEstimate(neighbor.pt, dst)
-						openSet.Add(neighbor)
+					if !openSet.Has(neighbour) || gScoreTentative < neighbour.gScore {
+						neighbour.cameFrom = current
+						neighbour.gScore = gScoreTentative
+						neighbour.fScore = gScoreTentative + neighbour.node.HeuristicCostEstimate(dst)
+						openSet.Add(neighbour)
 					}
 				}
 			}
-
-			if diagonal {
-				neighborCheck(Point{current.pt.X - 1, current.pt.Y - 1})
-				neighborCheck(Point{current.pt.X - 1, current.pt.Y + 1})
-				neighborCheck(Point{current.pt.X + 1, current.pt.Y - 1})
-				neighborCheck(Point{current.pt.X + 1, current.pt.Y + 1})
-			}
-
-			neighborCheck(Point{current.pt.X - 1, current.pt.Y + 0})
-			neighborCheck(Point{current.pt.X + 0, current.pt.Y - 1})
-			neighborCheck(Point{current.pt.X + 0, current.pt.Y + 1})
-			neighborCheck(Point{current.pt.X + 1, current.pt.Y + 0})
 		}
 	}
 
-	var points []Point
-
-	for _, node := range path {
-		points = append(points, node.pt)
-	}
-
-	return points
+	return nil
 }
