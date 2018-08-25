@@ -47,4 +47,11 @@ func Test1(test *testing.T) {
 	for tuple := range Select(cities, Name).In(Country, ccs...).Run() {
 		log.Println(tuple)
 	}
+
+	tables, err := Load("save")
+	log.Println(tables, err)
+
+	for tuple := range Select(tables[1]).Run() {
+		log.Println(tuple)
+	}
 }
