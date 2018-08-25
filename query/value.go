@@ -13,16 +13,30 @@ func VCopy(v Value) Value {
 	return v
 }
 
-type ValueEqual interface {
-	Equal(Value) bool
+type ValueEq interface {
+	Eq(Value) bool
 }
 
-func VEqual(v1, v2 Value) bool {
-	if _, ok := v1.(ValueEqual); ok {
-		return v1.(ValueEqual).Equal(v2)
+func VEq(v1, v2 Value) bool {
+	if _, ok := v1.(ValueEq); ok {
+		return v1.(ValueEq).Eq(v2)
 	}
-	if _, ok := v2.(ValueEqual); ok {
-		return v2.(ValueEqual).Equal(v1)
+	if _, ok := v2.(ValueEq); ok {
+		return v2.(ValueEq).Eq(v1)
+	}
+	return v1 == v2
+}
+
+type ValueLt interface {
+	Lt(Value) bool
+}
+
+func VLt(v1, v2 Value) bool {
+	if _, ok := v1.(ValueLt); ok {
+		return v1.(ValueLt).Lt(v2)
+	}
+	if _, ok := v2.(ValueLt); ok {
+		return v2.(ValueLt).Lt(v1)
 	}
 	return false
 }

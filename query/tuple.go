@@ -1,5 +1,22 @@
 package query
 
+import (
+	"encoding/gob"
+)
+
+func init() {
+	gob.Register(TupleId(0))
+}
+
+type TupleId int64
+
+func (t TupleId) Eq(v Value) bool {
+	if _, ok := v.(TupleId); ok {
+		return t == v.(TupleId)
+	}
+	return false
+}
+
 type Tuple map[Field]Value
 
 func (t Tuple) Copy() Tuple {

@@ -7,28 +7,44 @@ import (
 
 const (
 	Name Field = Id + 1 + iota
+	Country
 )
 
 func Test1(test *testing.T) {
 
-	t1 := NewTable()
-
-	id := NewId()
-
-	t1.Insert(Tuple{
-		(Id):   id,
-		(Name): "Sean",
+	countries := NewTable()
+	au := countries.Insert(Tuple{
+		(Name): "Australia",
 	})
-
-	t1.Insert(Tuple{
-		(Id):   NewId(),
-		(Name): "Eliza",
+	uk := countries.Insert(Tuple{
+		(Name): "England",
 	})
+	countries.Commit()
 
-	t1.Commit()
-	Save("save", t1)
+	cities := NewTable()
+	cities.Insert(Tuple{
+		(Name):    "Canberra",
+		(Country): au,
+	})
+	cities.Insert(Tuple{
+		(Name):    "Sydney",
+		(Country): au,
+	})
+	cities.Insert(Tuple{
+		(Name):    "London",
+		(Country): uk,
+	})
+	cities.Insert(Tuple{
+		(Name):    "Edinburgh",
+		(Country): uk,
+	})
+	cities.Commit()
 
-	for _, tuple := range t1.Select(t1.Equal(Name, id)) {
+	Save("save", countries, cities)
+
+	ccs := Select(countries).In(Name, "England", "Australia").List(Id)
+
+	for tuple := range Select(cities, Name).In(Country, ccs...).Run() {
 		log.Println(tuple)
 	}
 }
