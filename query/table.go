@@ -1,10 +1,15 @@
 package query
 
+import (
+	"sync"
+)
+
 type Column map[TupleId]Value
 
 type Table struct {
 	Fields map[Field]Column
 	Ids    map[TupleId]struct{}
+	lock   sync.Mutex
 	log    []func()
 }
 
@@ -16,20 +21,20 @@ func NewTable() *Table {
 }
 
 func (t *Table) Commit() {
+	t.lock.Lock()
 	for _, fn := range t.log {
 		fn()
 	}
 	t.log = []func(){}
+	t.lock.Unlock()
 }
 
-func (t *Table) Insert(tuple Tuple) TupleId {
+func (t *Table) Upsert(tuple Tuple) TupleId {
 	id := tuple.Id()
 	tuple = tuple.Copy()
+	t.lock.Lock()
 	t.log = append(t.log, func() {
 		t.Ids[id] = struct{}{}
-		for _, column := range t.Fields {
-			delete(column, id)
-		}
 		for field, value := range tuple {
 			if field == Id {
 				continue
@@ -40,16 +45,13 @@ func (t *Table) Insert(tuple Tuple) TupleId {
 			column := t.Fields[field]
 			column[id] = value
 		}
-		for field, column := range t.Fields {
-			if len(column) == 0 {
-				delete(t.Fields, field)
-			}
-		}
 	})
+	t.lock.Unlock()
 	return id
 }
 
 func (t *Table) Delete(id TupleId) {
+	t.lock.Lock()
 	t.log = append(t.log, func() {
 		delete(t.Ids, id)
 		for field, column := range t.Fields {
@@ -59,6 +61,14 @@ func (t *Table) Delete(id TupleId) {
 			}
 		}
 	})
+	t.lock.Unlock()
+}
+
+func (t *Table) Insert(tuple Tuple) TupleId {
+	id := tuple.Id()
+	t.Delete(id)
+	t.Upsert(tuple)
+	return id
 }
 
 func (t *Table) Select(id TupleId, fields ...Field) Tuple {

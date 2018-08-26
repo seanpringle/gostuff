@@ -40,7 +40,8 @@ func Test1(test *testing.T) {
 	})
 	cities.Commit()
 
-	Save("save", countries, cities)
+	Save("countries", countries)
+	Save("cities", cities)
 
 	ccs := Select(countries).In(Name, "England", "Australia").List(Id)
 
@@ -48,10 +49,13 @@ func Test1(test *testing.T) {
 		log.Println(tuple)
 	}
 
-	tables, err := Load("save")
-	log.Println(tables, err)
+	countries, err1 := Load("countries")
+	log.Println(countries, err1)
 
-	for tuple := range Select(tables[1]).Run() {
+	cities, err2 := Load("cities")
+	log.Println(cities, err2)
+
+	for tuple := range Select(countries).Run() {
 		log.Println(tuple)
 	}
 }

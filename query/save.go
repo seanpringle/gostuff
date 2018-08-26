@@ -1,8 +1,10 @@
 package query
 
 import (
+	"compress/gzip"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -22,7 +24,17 @@ func assert(err error) {
 	}
 }
 
-func Save(path string, tables ...*Table) (wtf error) {
+func Write(to io.Writer, table *Table) error {
+	save := gob.NewEncoder(to)
+	return save.Encode(table)
+}
+
+func Read(from io.Reader, table *Table) error {
+	load := gob.NewDecoder(from)
+	return load.Decode(&table)
+}
+
+func Save(path string, table *Table) (wtf error) {
 
 	defer func() {
 		wtf = catch(recover(), "Save")
@@ -32,13 +44,16 @@ func Save(path string, tables ...*Table) (wtf error) {
 	assert(err)
 	defer file.Close()
 
-	save := gob.NewEncoder(file)
-	assert(save.Encode(tables))
+	zip := gzip.NewWriter(file)
+	defer zip.Close()
+
+	save := gob.NewEncoder(zip)
+	assert(save.Encode(table))
 
 	return
 }
 
-func Load(path string) (tables []*Table, wtf error) {
+func Load(path string) (table *Table, wtf error) {
 
 	defer func() {
 		wtf = catch(recover(), "Load")
@@ -48,8 +63,12 @@ func Load(path string) (tables []*Table, wtf error) {
 	assert(err)
 	defer file.Close()
 
-	load := gob.NewDecoder(file)
-	assert(load.Decode(&tables))
+	zip, zerr := gzip.NewReader(file)
+	assert(zerr)
+	defer zip.Close()
+
+	load := gob.NewDecoder(zip)
+	assert(load.Decode(&table))
 
 	return
 }
