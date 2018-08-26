@@ -5,6 +5,7 @@ import (
 )
 
 type Field = int
+type Hook = int
 
 const Id Field = 0
 

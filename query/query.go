@@ -5,38 +5,25 @@ import (
 )
 
 type Query struct {
-	table  *Table
-	fields []Field
-	ids    chan TupleId
-	done   chan struct{}
-	limit  int
-	group  sync.WaitGroup
-	stages int
+	table   *Table
+	fields  []Field
+	limit   int
+	done    chan struct{}
+	group   sync.WaitGroup
+	view    []TupleId
+	filters []func(chan TupleId) chan TupleId
 }
 
 func Select(t *Table, fields ...Field) *Query {
-	q := &Query{
+	return &Query{
 		table:  t,
 		fields: fields,
 		done:   make(chan struct{}, 1000),
 	}
+}
 
-	output := make(chan TupleId, 8)
-	q.group.Add(1)
-	q.stages++
-	go func() {
-		for id, _ := range t.Ids {
-			select {
-			case <-q.done:
-				break
-			case output <- id:
-			}
-		}
-		close(output)
-		q.group.Done()
-	}()
-
-	q.ids = output
+func (q *Query) View(ids ...TupleId) *Query {
+	q.view = ids
 	return q
 }
 
@@ -46,24 +33,24 @@ func (q *Query) Limit(n int) *Query {
 }
 
 func (q *Query) Where(field Field, fn func(Value) bool) *Query {
-	output := make(chan TupleId, 8)
-	input := q.ids
-	q.ids = output
-	q.stages++
-	q.group.Add(1)
-	go func() {
-		for id := range input {
-			if fn(q.table.Fields[field][id]) {
-				select {
-				case <-q.done:
-					break
-				case output <- id:
+	q.filters = append(q.filters, func(input chan TupleId) chan TupleId {
+		output := make(chan TupleId, 8)
+		q.group.Add(1)
+		go func() {
+			for id := range input {
+				if fn(q.table.Fields[field][id]) {
+					select {
+					case <-q.done:
+						break
+					case output <- id:
+					}
 				}
 			}
-		}
-		close(output)
-		q.group.Done()
-	}()
+			close(output)
+			q.group.Done()
+		}()
+		return output
+	})
 	return q
 }
 
@@ -129,10 +116,41 @@ func (q *Query) Gte(field Field, value Value) *Query {
 }
 
 func (q *Query) Run() chan Tuple {
+
+	ids := make(chan TupleId, 8)
+	q.group.Add(1)
+	go func(ids chan TupleId) {
+		if q.view != nil {
+			// subset scan
+			for _, id := range q.view {
+				select {
+				case <-q.done:
+					break
+				case ids <- id:
+				}
+			}
+		} else {
+			// table scan
+			for id, _ := range q.table.Ids {
+				select {
+				case <-q.done:
+					break
+				case ids <- id:
+				}
+			}
+		}
+		close(ids)
+		q.group.Done()
+	}(ids)
+
+	for _, fn := range q.filters {
+		ids = fn(ids)
+	}
+
 	tuples := make(chan Tuple, 8)
 	go func() {
 		count := 0
-		for id := range q.ids {
+		for id := range ids {
 			select {
 			case <-q.done:
 				break
@@ -143,12 +161,13 @@ func (q *Query) Run() chan Tuple {
 				break
 			}
 		}
-		for i := 1; i < q.stages; i++ {
+		for i := 0; i < len(q.filters)+1; i++ {
 			q.done <- struct{}{}
 		}
 		q.group.Wait()
 		close(tuples)
 	}()
+
 	return tuples
 }
 
