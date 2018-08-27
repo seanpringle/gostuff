@@ -55,7 +55,14 @@ func Test1(test *testing.T) {
 	cities, err2 := Load("cities")
 	log.Println(cities, err2)
 
-	for tuple := range Select(countries).Run() {
+	for tuple := range Select(cities).Order(Name, ASC).Run() {
+		log.Println(tuple)
+	}
+
+	log.Println("group")
+
+	ids := Select(cities).Min(Id).Group(Country).List(Id)
+	for tuple := range Select(cities).In(Id, ids...).Run() {
 		log.Println(tuple)
 	}
 }

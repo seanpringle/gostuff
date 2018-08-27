@@ -2,6 +2,7 @@ package query
 
 import (
 	"encoding/gob"
+	"fmt"
 )
 
 func init() {
@@ -15,6 +16,17 @@ func (t TupleId) Eq(v Value) bool {
 		return t == v.(TupleId)
 	}
 	return false
+}
+
+func (t TupleId) Lt(v Value) bool {
+	if _, ok := v.(TupleId); ok {
+		return t < v.(TupleId)
+	}
+	return false
+}
+
+func (t TupleId) String() string {
+	return fmt.Sprintf("%d", t)
 }
 
 type Tuple map[Field]Value
