@@ -70,3 +70,25 @@ print("yo", l:len(), "\n")
 
 print("a,b,c":split(","))
 print("a,b,c":split(","):join(":"))
+
+c = chan(10)
+c:write(1)
+c:write(2)
+c:write(3)
+
+print(c:read())
+print(c:read())
+print(c:read())
+
+hi = func() {
+	print("hi\n")
+}
+
+g = group()
+g:run(hi)
+g:run(hi)
+g:run(hi)
+g:wait()
+print("done\n")
+
+print(b:get("hi"))

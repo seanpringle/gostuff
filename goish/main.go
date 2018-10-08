@@ -579,6 +579,7 @@ func (p *Parser) run() (wtf error) {
 	p.println(`import "math"`)
 	p.println(`import "strings"`)
 	p.println(`import "strconv"`)
+	p.println(`import "sync"`)
 
 	p.println(`type Any interface{
 		Type() string
@@ -594,6 +595,9 @@ func (p *Parser) run() (wtf error) {
 		var libMap *Map
 		var libList *Map
 		var libStr *Map
+		var libChan *Map
+		var libGroup *Map
+
 		type Stringer = fmt.Stringer
 
 		func (t Tup) Type() string {
@@ -781,6 +785,14 @@ func (p *Parser) run() (wtf error) {
 				if f, is := t.meta.(Func); is {
 					return f(Tup{t, key})[0]
 				}
+				if l, is := t.meta.(*List); is {
+					for _, i := range l.data {
+						r := find(i, key)
+						if r != nil {
+							return r
+						}
+					}
+				}
 				if t, is := t.meta.(*Map); is {
 					return t.Find(key)
 				}
@@ -864,6 +876,60 @@ func (p *Parser) run() (wtf error) {
 
 		func (f Func) Lib() *Map {
 			return libDef
+		}
+
+		type Chan chan Any
+
+		func (c Chan) Type() string {
+			return "channel"
+		}
+
+		func (c Chan) String() string {
+			return "channel"
+		}
+
+		func (c Chan) Lib() *Map {
+			return libChan
+		}
+
+		type Group struct {
+			g sync.WaitGroup
+		}
+
+		func NewGroup() *Group {
+			return &Group{}
+		}
+
+		func (g *Group) Type() string {
+			return "group"
+		}
+
+		func (g *Group) String() string {
+			return "group"
+		}
+
+		func (g *Group) Lib() *Map {
+			return libGroup
+		}
+
+		func (g *Group) Run(f Func, t Tup) {
+			g.g.Add(1)
+			go func() {
+				defer func() {
+					recover()
+					g.g.Done()
+				}()
+				f(append([]Any{g}, t...))
+			}()
+		}
+
+		func (g *Group) Done() {
+			g.g.Done()
+		}
+
+		func (g *Group) Wait() {
+			g.g.Wait()
+			g.g = sync.WaitGroup{}
 		}
 
 		func add(a, b Any) Any {
@@ -1007,11 +1073,17 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func call(f Any, aa Tup) Any {
-			return f.(Func)(aa)
+			if fn, is := f.(Func); is {
+				return fn(aa)
+			}
+			panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
 		}
 
 		func find(t Any, key Any) Any {
-			return t.Lib().Find(key)
+			if t != nil {
+				return t.Lib().Find(key)
+			}
+			return nil
 		}
 
 		func method(t Any, key Any) (Any, Any) {
@@ -1032,7 +1104,7 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func tostring(s Any) string {
-			return trymethod(s, "string", nil).(Str).s
+			return trymethod(s, "string", Str{"nil"}).(Str).s
 		}
 
 		var n_print Any = Func(func(aa Tup) Tup {
@@ -1040,6 +1112,16 @@ func (p *Parser) run() (wtf error) {
 				fmt.Printf("%s", tostring(a))
 			}
 			return aa
+		})
+
+		var n_chan Any = Func(func(t Tup) Tup {
+			n := get(t, 0).(IntIsh).Int().i64
+			c := make(chan Any, int(n))
+			return Tup{Chan(c)}
+		})
+
+		var n_group Any = Func(func(t Tup) Tup {
+			return Tup{NewGroup()}
 		})
 
 		var n_len Any = Func(func(t Tup) Tup {
@@ -1059,6 +1141,15 @@ func (p *Parser) run() (wtf error) {
 			return Tup{get(t, 0).Lib()}
 		})
 
+		var n_set Any = Func(func(t Tup) Tup {
+			get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
+			return Tup{get(t, 1), get(t, 2)}
+		})
+
+		var n_get Any = Func(func(t Tup) Tup {
+			return Tup{get(t, 0).(*Map).Get(get(t, 1))}
+		})
+
 		func init() {
 			libDef = NewMap(MapData{
 				Str{"len"}: n_len,
@@ -1074,13 +1165,8 @@ func (p *Parser) run() (wtf error) {
 					}
 					return Tup{NewList(keys)}
 				}),
-				Str{"set"}: Func(func(t Tup) Tup {
-					get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
-					return Tup{get(t, 1), get(t, 2)}
-				}),
-				Str{"get"}: Func(func(t Tup) Tup {
-					return Tup{get(t, 0).(*Map).Get(get(t, 0))}
-				}),
+				Str{"set"}: n_set,
+				Str{"get"}: n_get,
 				Str{"setmeta"}: Func(func(t Tup) Tup {
 					get(t, 0).(*Map).meta = get(t, 1)
 					return Tup{get(t, 1)}
@@ -1115,6 +1201,38 @@ func (p *Parser) run() (wtf error) {
 				}),
 			})
 			libList.meta = libDef
+			libChan = NewMap(MapData{
+				Str{"read"}: Func(func(t Tup) Tup {
+					c := get(t, 0).(Chan)
+					return Tup{<-c}
+				}),
+				Str{"write"}: Func(func(t Tup) Tup {
+					c := get(t, 0).(Chan)
+					a := get(t, 1)
+					c <-a
+					return Tup{Bool{true}}
+				}),
+				Str{"close"}: Func(func(t Tup) Tup {
+					c := get(t, 0).(Chan)
+					close(c)
+					return nil
+				}),
+			})
+			libChan.meta = libDef
+			libGroup = NewMap(MapData{
+				Str{"run"}: Func(func(t Tup) Tup {
+					g := get(t, 0).(*Group)
+					f := get(t, 1).(Func)
+					g.Run(f, t[2:])
+					return Tup{Bool{true}}
+				}),
+				Str{"wait"}: Func(func(t Tup) Tup {
+					g := get(t, 0).(*Group)
+					g.Wait()
+					return Tup{Bool{true}}
+				}),
+			})
+			libGroup.meta = libDef
 			libStr = NewMap(MapData{
 				Str{"split"}: Func(func(t Tup) Tup {
 					s := tostring(get(t, 0))

@@ -4,6 +4,7 @@ import "fmt"
 import "math"
 import "strings"
 import "strconv"
+import "sync"
 
 type Any interface {
 	Type() string
@@ -16,6 +17,8 @@ var libDef *Map
 var libMap *Map
 var libList *Map
 var libStr *Map
+var libChan *Map
+var libGroup *Map
 
 type Stringer = fmt.Stringer
 
@@ -204,6 +207,14 @@ func (t *Map) Find(key Any) Any {
 		if f, is := t.meta.(Func); is {
 			return f(Tup{t, key})[0]
 		}
+		if l, is := t.meta.(*List); is {
+			for _, i := range l.data {
+				r := find(i, key)
+				if r != nil {
+					return r
+				}
+			}
+		}
 		if t, is := t.meta.(*Map); is {
 			return t.Find(key)
 		}
@@ -287,6 +298,60 @@ func (f Func) Type() string {
 
 func (f Func) Lib() *Map {
 	return libDef
+}
+
+type Chan chan Any
+
+func (c Chan) Type() string {
+	return "channel"
+}
+
+func (c Chan) String() string {
+	return "channel"
+}
+
+func (c Chan) Lib() *Map {
+	return libChan
+}
+
+type Group struct {
+	g sync.WaitGroup
+}
+
+func NewGroup() *Group {
+	return &Group{}
+}
+
+func (g *Group) Type() string {
+	return "group"
+}
+
+func (g *Group) String() string {
+	return "group"
+}
+
+func (g *Group) Lib() *Map {
+	return libGroup
+}
+
+func (g *Group) Run(f Func, t Tup) {
+	g.g.Add(1)
+	go func() {
+		defer func() {
+			recover()
+			g.g.Done()
+		}()
+		f(append([]Any{g}, t...))
+	}()
+}
+
+func (g *Group) Done() {
+	g.g.Done()
+}
+
+func (g *Group) Wait() {
+	g.g.Wait()
+	g.g = sync.WaitGroup{}
 }
 
 func add(a, b Any) Any {
@@ -430,11 +495,17 @@ func get(aa Tup, i int) Any {
 }
 
 func call(f Any, aa Tup) Any {
-	return f.(Func)(aa)
+	if fn, is := f.(Func); is {
+		return fn(aa)
+	}
+	panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
 }
 
 func find(t Any, key Any) Any {
-	return t.Lib().Find(key)
+	if t != nil {
+		return t.Lib().Find(key)
+	}
+	return nil
 }
 
 func method(t Any, key Any) (Any, Any) {
@@ -455,7 +526,7 @@ func trymethod(t Any, k string, def Any) Any {
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", nil).(Str).s
+	return trymethod(s, "string", Str{"nil"}).(Str).s
 }
 
 var n_print Any = Func(func(aa Tup) Tup {
@@ -463,6 +534,16 @@ var n_print Any = Func(func(aa Tup) Tup {
 		fmt.Printf("%s", tostring(a))
 	}
 	return aa
+})
+
+var n_chan Any = Func(func(t Tup) Tup {
+	n := get(t, 0).(IntIsh).Int().i64
+	c := make(chan Any, int(n))
+	return Tup{Chan(c)}
+})
+
+var n_group Any = Func(func(t Tup) Tup {
+	return Tup{NewGroup()}
 })
 
 var n_len Any = Func(func(t Tup) Tup {
@@ -482,6 +563,15 @@ var n_lib Any = Func(func(t Tup) Tup {
 	return Tup{get(t, 0).Lib()}
 })
 
+var n_set Any = Func(func(t Tup) Tup {
+	get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
+	return Tup{get(t, 1), get(t, 2)}
+})
+
+var n_get Any = Func(func(t Tup) Tup {
+	return Tup{get(t, 0).(*Map).Get(get(t, 1))}
+})
+
 func init() {
 	libDef = NewMap(MapData{
 		Str{"len"}:    n_len,
@@ -497,13 +587,8 @@ func init() {
 			}
 			return Tup{NewList(keys)}
 		}),
-		Str{"set"}: Func(func(t Tup) Tup {
-			get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
-			return Tup{get(t, 1), get(t, 2)}
-		}),
-		Str{"get"}: Func(func(t Tup) Tup {
-			return Tup{get(t, 0).(*Map).Get(get(t, 0))}
-		}),
+		Str{"set"}: n_set,
+		Str{"get"}: n_get,
 		Str{"setmeta"}: Func(func(t Tup) Tup {
 			get(t, 0).(*Map).meta = get(t, 1)
 			return Tup{get(t, 1)}
@@ -538,6 +623,38 @@ func init() {
 		}),
 	})
 	libList.meta = libDef
+	libChan = NewMap(MapData{
+		Str{"read"}: Func(func(t Tup) Tup {
+			c := get(t, 0).(Chan)
+			return Tup{<-c}
+		}),
+		Str{"write"}: Func(func(t Tup) Tup {
+			c := get(t, 0).(Chan)
+			a := get(t, 1)
+			c <- a
+			return Tup{Bool{true}}
+		}),
+		Str{"close"}: Func(func(t Tup) Tup {
+			c := get(t, 0).(Chan)
+			close(c)
+			return nil
+		}),
+	})
+	libChan.meta = libDef
+	libGroup = NewMap(MapData{
+		Str{"run"}: Func(func(t Tup) Tup {
+			g := get(t, 0).(*Group)
+			f := get(t, 1).(Func)
+			g.Run(f, t[2:])
+			return Tup{Bool{true}}
+		}),
+		Str{"wait"}: Func(func(t Tup) Tup {
+			g := get(t, 0).(*Group)
+			g.Wait()
+			return Tup{Bool{true}}
+		}),
+	})
+	libGroup.meta = libDef
 	libStr = NewMap(MapData{
 		Str{"split"}: Func(func(t Tup) Tup {
 			s := tostring(get(t, 0))
@@ -554,14 +671,17 @@ func init() {
 
 func main() {
 	func() Tup {
+		var n_b Any
 		var n_t Any
 		var n_s Any
-		var n_l Any
 		var n_len Any
+		var n_hi Any
+		var n_g Any
 		var n_a Any
-		var n_b Any
 		var n_inc Any
 		var n_i Any
+		var n_l Any
+		var n_c Any
 		func() Tup {
 			aa := join(call(n_print, join(Int{1}, Str{"hi"})))
 			n_a = get(aa, 0)
@@ -630,13 +750,13 @@ func main() {
 			}()
 		}
 		func() Tup {
-			aa := join(NewMap(MapData{Str{"__*&^"}: Int{2}, Str{"c"}: NewMap(MapData{Str{"d"}: Func(func(aa Tup) Tup {
+			aa := join(NewMap(MapData{Str{"a"}: Int{1}, Str{"__*&^"}: Int{2}, Str{"c"}: NewMap(MapData{Str{"d"}: Func(func(aa Tup) Tup {
 				return func() Tup {
 
 					return join(Str{"helloworld"})
 					return nil
 				}()
-			})}), Str{"a"}: Int{1}}))
+			})})}))
 			n_t = get(aa, 0)
 			return aa
 		}()
@@ -698,6 +818,31 @@ func main() {
 			t, m := method(get(func() Any { t, m := method(Str{"a,b,c"}, Str{"split"}); return call(m, join(t, Str{","})) }().(Tup), 0), Str{"join"})
 			return call(m, join(t, Str{":"}))
 		}()))
+		func() Tup { aa := join(call(n_chan, join(Int{10}))); n_c = get(aa, 0); return aa }()
+		func() Any { t, m := method(n_c, Str{"write"}); return call(m, join(t, Int{1})) }()
+		func() Any { t, m := method(n_c, Str{"write"}); return call(m, join(t, Int{2})) }()
+		func() Any { t, m := method(n_c, Str{"write"}); return call(m, join(t, Int{3})) }()
+		call(n_print, join(func() Any { t, m := method(n_c, Str{"read"}); return call(m, join(t)) }()))
+		call(n_print, join(func() Any { t, m := method(n_c, Str{"read"}); return call(m, join(t)) }()))
+		call(n_print, join(func() Any { t, m := method(n_c, Str{"read"}); return call(m, join(t)) }()))
+		func() Tup {
+			aa := join(Func(func(aa Tup) Tup {
+				return func() Tup {
+
+					call(n_print, join(Str{"hi\n"}))
+					return nil
+				}()
+			}))
+			n_hi = get(aa, 0)
+			return aa
+		}()
+		func() Tup { aa := join(call(n_group, join())); n_g = get(aa, 0); return aa }()
+		func() Any { t, m := method(n_g, Str{"run"}); return call(m, join(t, n_hi)) }()
+		func() Any { t, m := method(n_g, Str{"run"}); return call(m, join(t, n_hi)) }()
+		func() Any { t, m := method(n_g, Str{"run"}); return call(m, join(t, n_hi)) }()
+		func() Any { t, m := method(n_g, Str{"wait"}); return call(m, join(t)) }()
+		call(n_print, join(Str{"done\n"}))
+		call(n_print, join(func() Any { t, m := method(n_b, Str{"get"}); return call(m, join(t, Str{"hi"})) }()))
 		return nil
 	}()
 }
