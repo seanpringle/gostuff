@@ -181,7 +181,7 @@ func (p *Parser) peek(s string) bool {
 }
 
 func (p *Parser) terminator() bool {
-	return p.scan() == rune(0) || p.scan() == ';' || p.scan() == ')' || p.scan() == '}'
+	return p.scan() == rune(0) || p.scan() == ';' || p.scan() == ')' || p.scan() == '}' || p.peek("end")
 }
 
 func (p *Parser) isalpha(c rune) bool {
@@ -220,7 +220,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 
 	if p.scan() == '(' {
 		p.take()
-		node := NewNodeExec(p.tuple(block))
+		node := NewNodeExec(p.tuple(block, nil))
 		ensure(p.scan() == ')', "expected closing paren (exec)")
 		p.take()
 		return node
@@ -309,10 +309,14 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		p.take()
 		p.take()
-		return NewNodeReturn(p.tuple(block))
+		return NewNodeReturn(p.tuple(block, nil))
 	}
 
-	if p.peek("func") {
+	if p.peek("function") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
 		p.take()
 		p.take()
 		p.take()
@@ -320,16 +324,19 @@ func (p *Parser) node(block *NodeBlock) Node {
 		ensure(p.scan() == '(', "expected opening paren (func)")
 		p.take()
 		var args Nodes
-		argTup := p.tuple(block)
+		argTup := p.tuple(block, nil)
 		if argTup != nil {
 			args = Nodes(argTup.(NodeTuple))
 		}
 		ensure(p.scan() == ')', "expected closing paren (func)")
 		p.take()
-		ensure(p.scan() == '{', "expected opening brace")
+		ensure(p.peek("do"), "expected: do")
 		p.take()
-		body := p.block(block, Scope{}).(*NodeBlock)
-		ensure(p.scan() == '}', "expected closing brace")
+		p.take()
+		body := p.block(block, Scope{}, nil).(*NodeBlock)
+		ensure(p.peek("end"), "expected: end")
+		p.take()
+		p.take()
 		p.take()
 		return NewNodeFunc(args, body)
 	}
@@ -338,13 +345,16 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		p.take()
 		p.take()
-		iter := p.tuple(block)
+		iter := p.tuple(block, nil)
 
 		body := func() Node {
-			ensure(p.scan() == '{', "expected opening brace (for)")
+			ensure(p.peek("do"), "expected: do")
 			p.take()
-			body := p.block(block, nil)
-			ensure(p.scan() == '}', "expected closing brace (for)")
+			p.take()
+			body := p.block(block, nil, []string{"break", "continue"})
+			ensure(p.peek("end"), "expected: end")
+			p.take()
+			p.take()
 			p.take()
 			return body
 		}
@@ -352,12 +362,12 @@ func (p *Parser) node(block *NodeBlock) Node {
 		if p.scan() == ';' {
 			p.take()
 			begin := iter
-			step := p.tuple(block)
+			step := p.tuple(block, nil)
 
 			if p.scan() == ';' {
 				p.take()
 				check := step
-				step = p.tuple(block)
+				step = p.tuple(block, nil)
 				return NewNodeFor3(begin, check, step, body())
 			}
 
@@ -370,37 +380,26 @@ func (p *Parser) node(block *NodeBlock) Node {
 	if p.peek("if") {
 		p.take()
 		p.take()
-		iter := p.tuple(block)
-		var body Node
-		if p.scan() == '{' {
-			ensure(p.scan() == '{', "expected opening brace")
+		iter := p.tuple(block, []string{"then"})
+		ensure(p.peek("then"), "expected: then")
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		var onfalse Node
+		ontrue := p.block(block, nil, []string{"else"})
+		if p.peek("else") {
 			p.take()
-			body = p.block(block, nil)
-			ensure(p.scan() == '}', "expected closing brace")
 			p.take()
-		} else {
-			body = p.tuple(block)
+			p.take()
+			p.take()
+			onfalse = p.block(block, nil, nil)
 		}
-		return NewNodeIf(iter, body)
-	}
-
-	if p.peek("else") {
+		ensure(p.peek("end"), "expected: end")
 		p.take()
 		p.take()
 		p.take()
-		p.take()
-		iter := p.tuple(block)
-		var body Node
-		if p.scan() == '{' {
-			ensure(p.scan() == '{', "expected opening brace")
-			p.take()
-			body = p.block(block, nil)
-			ensure(p.scan() == '}', "expected closing brace")
-			p.take()
-		} else {
-			body = p.tuple(block)
-		}
-		return NewNodeElse(iter, body)
+		return NewNodeIf(iter, ontrue, onfalse)
 	}
 
 	if p.isnumber(p.scan()) {
@@ -469,7 +468,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 	if p.scan() == '[' {
 		p.take()
 		var nodes Nodes
-		t := p.tuple(block)
+		t := p.tuple(block, nil)
 		if t != nil {
 			nodes = Nodes(t.(NodeTuple))
 		}
@@ -550,10 +549,22 @@ func (p *Parser) expression(block *NodeBlock) Node {
 	return items[0]
 }
 
-func (p *Parser) tuple(block *NodeBlock) Node {
+func (p *Parser) tuple(block *NodeBlock, terms []string) Node {
 	args := Nodes{}
 
-	if p.terminator() {
+	terminate := func() bool {
+		if p.terminator() {
+			return true
+		}
+		for _, term := range terms {
+			if p.peek(term) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if terminate() {
 		return nil
 	}
 
@@ -562,7 +573,7 @@ func (p *Parser) tuple(block *NodeBlock) Node {
 
 		if p.scan() == ',' {
 			p.take()
-			if !p.terminator() {
+			if !terminate() {
 				continue
 			}
 		}
@@ -581,7 +592,7 @@ func (p *Parser) tuple(block *NodeBlock) Node {
 
 			if p.scan() == ',' {
 				p.take()
-				if !p.terminator() {
+				if !terminate() {
 					continue
 				}
 			}
@@ -599,9 +610,9 @@ func (p *Parser) tuple(block *NodeBlock) Node {
 	return nil
 }
 
-func (p *Parser) block(parent *NodeBlock, scope Scope) Node {
+func (p *Parser) block(parent *NodeBlock, scope Scope, terms []string) Node {
 	block := NewNodeBlock(parent, scope)
-	for expr := p.tuple(block); expr != nil; expr = p.tuple(block) {
+	for expr := p.tuple(block, terms); expr != nil; expr = p.tuple(block, terms) {
 		block.Consume(expr)
 	}
 	return block
@@ -810,6 +821,24 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (d Dec) Lib() *Map {
+			return libDef
+		}
+
+		type Rune rune
+
+		func (r Rune) Bool() Bool {
+			return Bool{rune(r) != rune(0)}
+		}
+
+		func (r Rune) Type() string {
+			return "rune"
+		}
+
+		func (r Rune) String() string {
+			return string([]rune{rune(r)})
+		}
+
+		func (r Rune) Lib() *Map {
 			return libDef
 		}
 
@@ -1273,6 +1302,22 @@ func (p *Parser) run() (wtf error) {
 				Str{"getmeta"}: Func(func(t Tup) Tup {
 					return Tup{get(t, 0).(*Map).meta}
 				}),
+				Str{"iterate"}: Func(func(t Tup) Tup {
+					m := get(t, 0).(*Map)
+					keys := []Any{}
+					for k, _ := range m.data {
+						keys = append(keys, k)
+					}
+					n := 0
+					return Tup{Func(func(tt Tup) Tup {
+						k := get(keys, n)
+						n = n+1
+						if k != nil {
+							return Tup{k, m.Get(k)}
+						}
+						return Tup{nil, nil}
+					})}
+				}),
 			})
 			libMap.meta = libDef
 			libList = NewMap(MapData{
@@ -1308,6 +1353,15 @@ func (p *Parser) run() (wtf error) {
 				Str{"get"}: Func(func(t Tup) Tup {
 					return Tup{get(t, 0).(*List).Get(get(t, 1))}
 				}),
+				Str{"iterate"}: Func(func(t Tup) Tup {
+					l := get(t, 0).(*List)
+					n := 0
+					return Tup{Func(func(tt Tup) Tup {
+						v := get(l.data, n)
+						n = n+1
+						return Tup{v}
+					})}
+				}),
 			})
 			libList.meta = libDef
 			libChan = NewMap(MapData{
@@ -1325,6 +1379,12 @@ func (p *Parser) run() (wtf error) {
 					c := get(t, 0).(Chan)
 					close(c)
 					return nil
+				}),
+				Str{"iterate"}: Func(func(t Tup) Tup {
+					c := get(t, 0).(Chan)
+					return Tup{Func(func(tt Tup) Tup {
+						return Tup{<-c}
+					})}
 				}),
 			})
 			libChan.meta = libDef
@@ -1352,6 +1412,22 @@ func (p *Parser) run() (wtf error) {
 					}
 					return Tup{NewList(l)}
 				}),
+				Str{"iterate"}: Func(func(t Tup) Tup {
+					s := tostring(get(t, 0))
+					chars := []rune{}
+					for _, c := range s {
+						chars = append(chars, c)
+					}
+					n := 0
+					return Tup{Func(func(tt Tup) Tup {
+						if len(chars) > n {
+							v := Rune(chars[n])
+							n = n+1
+							return Tup{v}
+						}
+						return Tup{nil}
+					})}
+				}),
 			})
 			libStr.meta = libDef
 		}
@@ -1359,7 +1435,7 @@ func (p *Parser) run() (wtf error) {
 	`)
 
 	p.println(`func main() {`)
-	block := p.block(nil, Scope{})
+	block := p.block(nil, Scope{}, nil)
 	p.println(block.Format())
 	p.println(`}`)
 	return

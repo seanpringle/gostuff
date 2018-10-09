@@ -104,6 +104,10 @@ for it = iter([1,2,3]); i = it() do
 	print(i, "\n")
 end
 
+for it = [4,5,6]:iterate(); i = it() do
+	print(i, "\n")
+end
+
 print("\n")
 
 print(true and "yes" or "no")
@@ -116,3 +120,11 @@ print(
 	function() do return [1,2,3] end(),
 	function() do return [4,5,6] end(),
 )
+
+for it = { a = 1, b = 2, c = 3 }:iterate(); k, v = it() do
+	print(k, " ", v, "\n")
+end
+
+for it = "abc":iterate(); c = it() do
+	print(c, "\n")
+end

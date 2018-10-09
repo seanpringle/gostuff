@@ -69,3 +69,23 @@ func (nf *NodeFor3) Format() string {
 func (nf *NodeFor3) String() string {
 	return fmt.Sprintf("NodeFor3{%s;%s;%s;%s}", nf.begin, nf.check, nf.step, nf.body)
 }
+
+type NodeForIn struct {
+	iter Node
+	body Node
+}
+
+func NewNodeForIn(iter, body Node) *NodeForIn {
+	return &NodeForIn{iter, body}
+}
+
+func (nf *NodeForIn) Format() string {
+	return fmt.Sprintf("func() { i := get(join(%s), 0).(Func); for truth(i()) { %s } }()",
+		nf.iter.Format(),
+		nf.body.Format(),
+	)
+}
+
+func (nf *NodeForIn) String() string {
+	return fmt.Sprintf("NodeForIn{%s;%s}", nf.iter, nf.body)
+}

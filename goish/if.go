@@ -5,21 +5,27 @@ import (
 )
 
 type NodeIf struct {
-	flag Node
-	body Node
+	flag    Node
+	ontrue  Node
+	onfalse Node
 }
 
-func NewNodeIf(flag, body Node) *NodeIf {
+func NewNodeIf(flag, ontrue, onfalse Node) *NodeIf {
 	return &NodeIf{
-		flag: flag,
-		body: body,
+		flag:    flag,
+		ontrue:  ontrue,
+		onfalse: onfalse,
 	}
 }
 
 func (nf *NodeIf) Format() string {
-	return fmt.Sprintf("if truth(%s) { %s }", nf.flag.Format(), nf.body.Format())
+	if nf.onfalse != nil {
+		return fmt.Sprintf("if truth(%s) { %s } else { %s }", nf.flag.Format(), nf.ontrue.Format(), nf.onfalse.Format())
+
+	}
+	return fmt.Sprintf("if truth(%s) { %s }", nf.flag.Format(), nf.ontrue.Format())
 }
 
 func (nf *NodeIf) String() string {
-	return fmt.Sprintf("NodeIf{%s:%s}", nf.flag, nf.body)
+	return fmt.Sprintf("NodeIf{%s:%s:%s}", nf.flag, nf.ontrue, nf.onfalse)
 }
