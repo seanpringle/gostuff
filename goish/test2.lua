@@ -2,12 +2,12 @@ a, b = print(1,"hi")
 print(1 and 0 or 3)
 print(5+6)
 
-inc = func(a) { return a+1 }
+inc = function(a) do return a+1 end
 print(inc(42))
 
 print(a == 1 and 7 or 9)
 
-t = { a = 1, "__*&^" = 2, c = { d = func() { return "hello world" }}}
+t = { a = 1, "__*&^" = 2, c = { d = function() do return "hello world" end}}
 
 print(t.c.d())
 t.a = 42
@@ -18,14 +18,14 @@ print("\n", t:keys())
 print(2*2+3)
 
 t = {
-	g = func() {
+	g = function() do
 		return "hello world"
-	},
+	end,
 }
 
-t.m = func(self) {
+t.m = function(self) do
 	return self:g()
-}
+end
 
 print(t:m())
 
@@ -74,9 +74,9 @@ print(c:read())
 print(c:read())
 print(c:read())
 
-hi = func(g) {
+hi = function(g) do
 	print("hi\n")
-}
+end
 
 g = group()
 g:run(hi)
@@ -91,28 +91,28 @@ true = 0 < 1
 false = 1 < 0
 nil = []:pop()
 
-iter = func(list) {
+iter = function(list) do
 	t = { pos = 0 }
-	return func() {
+	return function() do
 		v = list:get(t.pos)
 		t.pos = t.pos + 1
 		return v
-	}
-}
+	end
+end
 
-for it = iter([1,2,3]); i = it() {
+for it = iter([1,2,3]); i = it() do
 	print(i, "\n")
-}
+end
 
 print("\n")
 
 print(true and "yes" or "no")
 
-for i = 0; i < 10; i = i + 1 {
+for i = 0; i < 10; i = i + 1 do
 	print(i, "\n")
-}
+end
 
 print(
-	func() { return [1,2,3] }(),
-	func() { return [4,5,6] }(),
+	function() do return [1,2,3] end(),
+	function() do return [4,5,6] end(),
 )

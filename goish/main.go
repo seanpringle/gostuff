@@ -181,7 +181,7 @@ func (p *Parser) peek(s string) bool {
 }
 
 func (p *Parser) terminator() bool {
-	return p.scan() == rune(0) || p.scan() == ')' || p.scan() == '}'
+	return p.scan() == rune(0) || p.scan() == ';' || p.scan() == ')' || p.scan() == '}'
 }
 
 func (p *Parser) isalpha(c rune) bool {
@@ -201,7 +201,7 @@ func (p *Parser) iswhite(c rune) bool {
 }
 
 func (p *Parser) issymbol(c rune) bool {
-	return unicode.IsSymbol(c) || unicode.IsPunct(c)
+	return (unicode.IsSymbol(c) || unicode.IsPunct(c)) && !p.iswhite(c)
 }
 
 func (p *Parser) isname(c rune) bool {
@@ -334,23 +334,77 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeFunc(args, body)
 	}
 
-	if p.peek("while") {
+	if p.peek("for") {
+		p.take()
+		p.take()
+		p.take()
+		iter := p.tuple(block)
+
+		body := func() Node {
+			ensure(p.scan() == '{', "expected opening brace (for)")
+			p.take()
+			body := p.block(block, nil)
+			ensure(p.scan() == '}', "expected closing brace (for)")
+			p.take()
+			return body
+		}
+
+		if p.scan() == ';' {
+			p.take()
+			begin := iter
+			step := p.tuple(block)
+
+			if p.scan() == ';' {
+				p.take()
+				check := step
+				step = p.tuple(block)
+				return NewNodeFor3(begin, check, step, body())
+			}
+
+			return NewNodeFor2(begin, step, body())
+		}
+
+		return NewNodeFor(iter, body())
+	}
+
+	if p.peek("if") {
+		p.take()
+		p.take()
+		iter := p.tuple(block)
+		var body Node
+		if p.scan() == '{' {
+			ensure(p.scan() == '{', "expected opening brace")
+			p.take()
+			body = p.block(block, nil)
+			ensure(p.scan() == '}', "expected closing brace")
+			p.take()
+		} else {
+			body = p.tuple(block)
+		}
+		return NewNodeIf(iter, body)
+	}
+
+	if p.peek("else") {
 		p.take()
 		p.take()
 		p.take()
 		p.take()
-		p.take()
-		flag := p.expression(block)
-		ensure(p.scan() == '{', "expected opening brace")
-		p.take()
-		body := p.block(block, nil)
-		ensure(p.scan() == '}', "expected closing brace")
-		p.take()
-		return NewNodeWhile(flag, body)
+		iter := p.tuple(block)
+		var body Node
+		if p.scan() == '{' {
+			ensure(p.scan() == '{', "expected opening brace")
+			p.take()
+			body = p.block(block, nil)
+			ensure(p.scan() == '}', "expected closing brace")
+			p.take()
+		} else {
+			body = p.tuple(block)
+		}
+		return NewNodeElse(iter, body)
 	}
 
 	if p.isnumber(p.scan()) {
-		for p.isnumber(p.scan()) {
+		for p.isnumber(p.next()) {
 			str = append(str, p.take())
 		}
 		return NewNodeLitInt(parseInt(string(str)))
@@ -358,20 +412,20 @@ func (p *Parser) node(block *NodeBlock) Node {
 
 	if p.scan() == '"' {
 		str = append(str, p.take())
-		for p.scan() != '"' {
+		for p.next() != '"' {
 			c := p.take()
 			str = append(str, c)
 			if c == '\\' {
 				str = append(str, p.take())
 			}
 		}
-		ensure(p.scan() == '"', "expected closing quotes")
+		ensure(p.next() == '"', "expected closing quotes")
 		str = append(str, p.take())
 		return NewNodeLitStr(string(str))
 	}
 
 	if p.isname(p.scan()) {
-		for p.isname(p.scan()) {
+		for p.isname(p.next()) {
 			str = append(str, p.take())
 		}
 		return NewNodeName(string(str))
@@ -414,10 +468,14 @@ func (p *Parser) node(block *NodeBlock) Node {
 
 	if p.scan() == '[' {
 		p.take()
-		t := p.tuple(block).(NodeTuple)
+		var nodes Nodes
+		t := p.tuple(block)
+		if t != nil {
+			nodes = Nodes(t.(NodeTuple))
+		}
 		ensure(p.scan() == ']', "expected closing bracket (slice)")
 		p.take()
-		return NewNodeList(Nodes(t))
+		return NewNodeList(nodes)
 	}
 
 	return nil
@@ -587,8 +645,6 @@ func (p *Parser) run() (wtf error) {
 		String() string
 	}`)
 
-	p.println(`type Tup []Any`)
-
 	p.print(`
 
 		var libDef *Map
@@ -599,6 +655,8 @@ func (p *Parser) run() (wtf error) {
 		var libGroup *Map
 
 		type Stringer = fmt.Stringer
+
+		type Tup []Any
 
 		func (t Tup) Type() string {
 			return "tuple"
@@ -623,6 +681,13 @@ func (p *Parser) run() (wtf error) {
 				items = append(items, tostring(v))
 			}
 			return fmt.Sprintf("[%s]", strings.Join(items, ", "))
+		}
+
+		func (t Tup) Bool() Bool {
+			if len(t) > 0 {
+				return Bool{truth(t[0])}
+			}
+			return Bool{false}
 		}
 
 		type BoolIsh interface {
@@ -690,6 +755,10 @@ func (p *Parser) run() (wtf error) {
 
 		func (s Str) Lib() *Map {
 			return libStr
+		}
+
+		func (s Str) Bool() Bool {
+			return Bool{len(s.s) > 0}
 		}
 
 		type Int struct {
@@ -763,40 +832,46 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (t *Map) Get(key Any) Any {
-			if v, ok := t.data[key]; ok {
-				return v
+			if t != nil {
+				if v, ok := t.data[key]; ok {
+					return v
+				}
 			}
 			return nil
 		}
 
 		func (t *Map) Set(key Any, val Any) {
-			if val == nil {
-				delete(t.data, key)
-			} else {
-				t.data[key] = val
+			if t != nil {
+				if val == nil {
+					delete(t.data, key)
+				} else {
+					t.data[key] = val
+				}
 			}
 		}
 
 		func (t *Map) Find(key Any) Any {
-			if v, ok := t.data[key]; ok {
-				return v
-			}
-			if t.meta != nil {
-				if f, is := t.meta.(Func); is {
-					return f(Tup{t, key})[0]
+			if t != nil {
+				if v, ok := t.data[key]; ok {
+					return v
 				}
-				if l, is := t.meta.(*List); is {
-					for _, i := range l.data {
-						r := find(i, key)
-						if r != nil {
-							return r
+				if t.meta != nil {
+					if f, is := t.meta.(Func); is {
+						return f(Tup{t, key})[0]
+					}
+					if l, is := t.meta.(*List); is {
+						for _, i := range l.data {
+							r := find(i, key)
+							if r != nil {
+								return r
+							}
 						}
 					}
+					if t, is := t.meta.(*Map); is {
+						return t.Find(key)
+					}
+					return t.meta
 				}
-				if t, is := t.meta.(*Map); is {
-					return t.Find(key)
-				}
-				return t.meta
 			}
 			return nil
 		}
@@ -806,21 +881,27 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (t *Map) Len() int64 {
-			return int64(len(t.data))
+			if t != nil {
+				return int64(len(t.data))
+			}
+			return 0
 		}
 
 		func (t *Map) String() string {
-			pairs := []string{}
-			for k, v := range t.data {
-				if _, is := v.(*Map); is {
-					v = Str{"map"}
+			if t != nil {
+				pairs := []string{}
+				for k, v := range t.data {
+					if _, is := v.(*Map); is {
+						v = Str{"map"}
+					}
+					if _, is := v.(*List); is {
+						v = Str{"slice"}
+					}
+					pairs = append(pairs, fmt.Sprintf("%v = %v", tostring(k), tostring(v)))
 				}
-				if _, is := v.(*List); is {
-					v = Str{"slice"}
-				}
-				pairs = append(pairs, fmt.Sprintf("%v = %v", tostring(k), tostring(v)))
+				return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
 			}
-			return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+			return "nil"
 		}
 
 		type List struct {
@@ -858,6 +939,25 @@ func (p *Parser) run() (wtf error) {
 				items = append(items, tostring(v))
 			}
 			return fmt.Sprintf("[%s]", strings.Join(items, ", "))
+		}
+
+		func (l *List) Set(pos Any, val Any) {
+			if l != nil {
+				n := pos.(IntIsh).Int().i64
+				if int64(len(l.data)) > n {
+					l.data[n] = val
+				}
+			}
+		}
+
+		func (l *List) Get(pos Any) Any {
+			if l != nil {
+				n := pos.(IntIsh).Int().i64
+				if int64(len(l.data)) > n {
+					return l.data[n]
+				}
+			}
+			return nil
 		}
 
 		type Func func(Tup) Tup
@@ -1041,14 +1141,13 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func truth(a interface{}) bool {
-			if a == nil {
-				return false
-			}
-			if b, is := a.(bool); is {
-				return b
-			}
-			if ab, is := a.(BoolIsh); is {
-				return ab.Bool().b
+			if a != nil {
+				if b, is := a.(bool); is {
+					return b
+				}
+				if ab, is := a.(BoolIsh); is {
+					return ab.Bool().b
+				}
 			}
 			return false
 		}
@@ -1107,55 +1206,50 @@ func (p *Parser) run() (wtf error) {
 			return trymethod(s, "string", Str{"nil"}).(Str).s
 		}
 
-		var n_print Any = Func(func(aa Tup) Tup {
+		func noop(a Any) Any {
+			return a
+		}
+
+		var Nprint Any = Func(func(aa Tup) Tup {
 			for _, a := range aa {
 				fmt.Printf("%s", tostring(a))
 			}
 			return aa
 		})
 
-		var n_chan Any = Func(func(t Tup) Tup {
+		var Nchan Any = Func(func(t Tup) Tup {
 			n := get(t, 0).(IntIsh).Int().i64
 			c := make(chan Any, int(n))
 			return Tup{Chan(c)}
 		})
 
-		var n_group Any = Func(func(t Tup) Tup {
+		var Ngroup Any = Func(func(t Tup) Tup {
 			return Tup{NewGroup()}
 		})
 
-		var n_len Any = Func(func(t Tup) Tup {
+		var Nlen Any = Func(func(t Tup) Tup {
 			s := get(t, 0).(LenIsh)
 			return Tup{Int{s.Len()}}
 		})
 
-		var n_type Any = Func(func(t Tup) Tup {
+		var Ntype Any = Func(func(t Tup) Tup {
 			return Tup{Str{get(t, 0).Type()}}
 		})
 
-		var n_string Any = Func(func(t Tup) Tup {
+		var Nstring Any = Func(func(t Tup) Tup {
 			return Tup{Str{fmt.Sprintf("%v", get(t, 0))}}
 		})
 
-		var n_lib Any = Func(func(t Tup) Tup {
+		var Nlib Any = Func(func(t Tup) Tup {
 			return Tup{get(t, 0).Lib()}
-		})
-
-		var n_set Any = Func(func(t Tup) Tup {
-			get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
-			return Tup{get(t, 1), get(t, 2)}
-		})
-
-		var n_get Any = Func(func(t Tup) Tup {
-			return Tup{get(t, 0).(*Map).Get(get(t, 1))}
 		})
 
 		func init() {
 			libDef = NewMap(MapData{
-				Str{"len"}: n_len,
-				Str{"lib"}: n_lib,
-				Str{"type"}: n_type,
-				Str{"string"}: n_string,
+				Str{"len"}: Nlen,
+				Str{"lib"}: Nlib,
+				Str{"type"}: Ntype,
+				Str{"string"}: Nstring,
 			})
 			libMap = NewMap(MapData{
 				Str{"keys"}: Func(func(t Tup) Tup {
@@ -1165,8 +1259,13 @@ func (p *Parser) run() (wtf error) {
 					}
 					return Tup{NewList(keys)}
 				}),
-				Str{"set"}: n_set,
-				Str{"get"}: n_get,
+				Str{"set"}: Func(func(t Tup) Tup {
+					get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
+					return Tup{get(t, 1), get(t, 2)}
+				}),
+				Str{"get"}: Func(func(t Tup) Tup {
+					return Tup{get(t, 0).(*Map).Get(get(t, 1))}
+				}),
 				Str{"setmeta"}: Func(func(t Tup) Tup {
 					get(t, 0).(*Map).meta = get(t, 1)
 					return Tup{get(t, 1)}
@@ -1186,8 +1285,11 @@ func (p *Parser) run() (wtf error) {
 				Str{"pop"}: Func(func(t Tup) Tup {
 					l := get(t, 0).(*List)
 					n := len(l.data)-1
-					v := l.data[n]
-					l.data = l.data[0:n]
+					var v Any
+					if len(l.data) < n {
+						v = l.data[n]
+						l.data = l.data[0:n]
+					}
 					return Tup{v}
 				}),
 				Str{"join"}: Func(func(t Tup) Tup {
@@ -1198,6 +1300,13 @@ func (p *Parser) run() (wtf error) {
 						ls = append(ls, tostring(s))
 					}
 					return Tup{Str{strings.Join(ls, tostring(j))}}
+				}),
+				Str{"set"}: Func(func(t Tup) Tup {
+					get(t, 0).(*List).Set(get(t, 1), get(t, 2))
+					return Tup{get(t, 1), get(t, 2)}
+				}),
+				Str{"get"}: Func(func(t Tup) Tup {
+					return Tup{get(t, 0).(*List).Get(get(t, 1))}
 				}),
 			})
 			libList.meta = libDef
@@ -1253,8 +1362,6 @@ func (p *Parser) run() (wtf error) {
 	block := p.block(nil, Scope{})
 	p.println(block.Format())
 	p.println(`}`)
-
-	log.Println(block)
 	return
 }
 

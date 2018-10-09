@@ -21,7 +21,7 @@ func (nf *NodeFunc) Format() string {
 
 	init := []string{}
 	for i, arg := range nf.args {
-		init = append(init, fmt.Sprintf("%s := get(aa, %d)", arg.(*NodeName).Format(), i))
+		init = append(init, fmt.Sprintf("%s := get(aa, %d); noop(%s)", arg.(*NodeName).Format(), i, arg.(*NodeName).Format()))
 	}
 
 	return fmt.Sprintf("Func(func(aa Tup) Tup { %s; return %s })",

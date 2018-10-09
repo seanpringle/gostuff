@@ -15,7 +15,7 @@ func NewNodeName(name string) *NodeName {
 }
 
 func (nn *NodeName) Format() string {
-	return fmt.Sprintf(`n_%s`, nn.name)
+	return fmt.Sprintf(`N%s`, nn.name)
 }
 
 func (nn *NodeName) String() string {

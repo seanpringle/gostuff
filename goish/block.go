@@ -44,7 +44,7 @@ func (nb *NodeBlock) Format() string {
 	for _, n := range nb.scope {
 		scope = append(scope, n.Format())
 	}
-	return fmt.Sprintf("func() Tup {\n %s\n %s\n return nil }()",
+	return fmt.Sprintf("func() Tup {\n %s; %s\n return Tup{nil} }()",
 		strings.Join(scope, "\n"),
 		nb.expr.FormatJoin("\n"),
 	)
