@@ -29,7 +29,7 @@ func (na *NodeAdd) Precedence() int {
 }
 
 func (na *NodeAdd) Format() string {
-	return fmt.Sprintf("add(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("add(one(%s), one(%s))", na.args[1].Format(), na.args[0].Format())
 }
 
 func (na *NodeAdd) String() string {

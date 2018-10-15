@@ -181,7 +181,12 @@ func (p *Parser) peek(s string) bool {
 }
 
 func (p *Parser) terminator() bool {
-	return p.scan() == rune(0) || p.scan() == ';' || p.scan() == ')' || p.scan() == '}' || p.peek("end")
+	return p.scan() == rune(0) || p.scan() == ';' || p.scan() == ')' || p.scan() == '}' || p.scan() == ']' || p.peek("end")
+}
+
+func (p *Parser) operator() bool {
+	c := p.scan()
+	return c == '=' || c == '+' || c == '-' || c == '>' || c == '<' || p.peek("or") || p.peek("and")
 }
 
 func (p *Parser) isalpha(c rune) bool {
@@ -213,6 +218,13 @@ func (p *Parser) iskeyword(w string) bool {
 }
 
 func (p *Parser) node(block *NodeBlock) Node {
+
+	for p.scan() == '-' && p.char(1) == '-' {
+		p.take()
+		p.take()
+		for c := p.take(); c != rune(0) && c != '\n'; c = p.take() {
+		}
+	}
 
 	if p.terminator() {
 		return nil
@@ -312,6 +324,27 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeReturn(p.tuple(block, nil))
 	}
 
+	if p.peek("do") {
+		p.take()
+		p.take()
+		var args Nodes
+		if p.scan() == '(' {
+			p.take()
+			argTup := p.tuple(block, nil)
+			if argTup != nil {
+				args = Nodes(argTup.(NodeTuple))
+			}
+			ensure(p.scan() == ')', "expected closing paren (do)")
+			p.take()
+		}
+		body := p.block(block, nil, nil).(*NodeBlock)
+		ensure(p.peek("end"), "expected: end (do)")
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeFunc(args, body)
+	}
+
 	if p.peek("function") {
 		p.take()
 		p.take()
@@ -330,51 +363,12 @@ func (p *Parser) node(block *NodeBlock) Node {
 		}
 		ensure(p.scan() == ')', "expected closing paren (func)")
 		p.take()
-		ensure(p.peek("do"), "expected: do")
-		p.take()
-		p.take()
 		body := p.block(block, Scope{}, nil).(*NodeBlock)
-		ensure(p.peek("end"), "expected: end")
+		ensure(p.peek("end"), "expected: end (function)")
 		p.take()
 		p.take()
 		p.take()
 		return NewNodeFunc(args, body)
-	}
-
-	if p.peek("for") {
-		p.take()
-		p.take()
-		p.take()
-		iter := p.tuple(block, nil)
-
-		body := func() Node {
-			ensure(p.peek("do"), "expected: do")
-			p.take()
-			p.take()
-			body := p.block(block, nil, []string{"break", "continue"})
-			ensure(p.peek("end"), "expected: end")
-			p.take()
-			p.take()
-			p.take()
-			return body
-		}
-
-		if p.scan() == ';' {
-			p.take()
-			begin := iter
-			step := p.tuple(block, nil)
-
-			if p.scan() == ';' {
-				p.take()
-				check := step
-				step = p.tuple(block, nil)
-				return NewNodeFor3(begin, check, step, body())
-			}
-
-			return NewNodeFor2(begin, step, body())
-		}
-
-		return NewNodeFor(iter, body())
 	}
 
 	if p.peek("if") {
@@ -395,16 +389,74 @@ func (p *Parser) node(block *NodeBlock) Node {
 			p.take()
 			onfalse = p.block(block, nil, nil)
 		}
-		ensure(p.peek("end"), "expected: end")
+		ensure(p.peek("end"), "expected: end (if)")
 		p.take()
 		p.take()
 		p.take()
 		return NewNodeIf(iter, ontrue, onfalse)
 	}
 
+	if p.peek("for") {
+		p.take()
+		p.take()
+		p.take()
+		iter := p.expression(block)
+		body := p.tuple(block, nil)
+		return NewNodeFor(iter, body)
+	}
+
+	if p.peek("while") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		cond := p.tuple(block, nil)
+		body := p.tuple(block, nil)
+		return NewNodeWhile(cond, body)
+	}
+
+	if p.peek("until") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		cond := p.tuple(block, nil)
+		body := p.tuple(block, nil)
+		return NewNodeUntil(cond, body)
+	}
+
+	if p.peek("break") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeBreak()
+	}
+
+	if p.peek("continue") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeContinue()
+	}
+
 	if p.isnumber(p.scan()) {
+		isDec := false
 		for p.isnumber(p.next()) {
-			str = append(str, p.take())
+			c := p.take()
+			str = append(str, c)
+			isDec = isDec || c == '.'
+		}
+		if isDec {
+			return NewNodeLitDec(parseDec(string(str)))
 		}
 		return NewNodeLitInt(parseInt(string(str)))
 	}
@@ -521,12 +573,17 @@ func (p *Parser) expression(block *NodeBlock) Node {
 			items = items.Push(node)
 		}
 
-		if p.scan() == ',' || p.scan() == '{' || p.terminator() {
-			break
+		consuming := 0
+		for _, op := range ops {
+			consuming += op.(Operator).Consumes()
 		}
 
-		if len(ops) > 0 && ops.Last().(Operator).Consumes() > len(items) {
+		if consuming > len(items) {
 			continue
+		}
+
+		if p.scan() == ',' || p.scan() == '{' || p.scan() == '[' || p.terminator() {
+			break
 		}
 
 		if !p.issymbol(p.scan()) && !p.peek("or") && !p.peek("and") {
@@ -550,7 +607,6 @@ func (p *Parser) expression(block *NodeBlock) Node {
 }
 
 func (p *Parser) tuple(block *NodeBlock, terms []string) Node {
-	args := Nodes{}
 
 	terminate := func() bool {
 		if p.terminator() {
@@ -567,6 +623,8 @@ func (p *Parser) tuple(block *NodeBlock, terms []string) Node {
 	if terminate() {
 		return nil
 	}
+
+	args := Nodes{}
 
 	for expr := p.expression(block); expr != nil; expr = p.expression(block) {
 		args = append(args, expr)
@@ -649,6 +707,7 @@ func (p *Parser) run() (wtf error) {
 	p.println(`import "strings"`)
 	p.println(`import "strconv"`)
 	p.println(`import "sync"`)
+	p.println(`import "time"`)
 
 	p.println(`type Any interface{
 		Type() string
@@ -664,6 +723,8 @@ func (p *Parser) run() (wtf error) {
 		var libStr *Map
 		var libChan *Map
 		var libGroup *Map
+		var libTime *Map
+		var libTick *Map
 
 		type Stringer = fmt.Stringer
 
@@ -719,6 +780,10 @@ func (p *Parser) run() (wtf error) {
 
 		type LenIsh interface {
 			Len() int64
+		}
+
+		type IterIsh interface {
+			Iterate() Func
 		}
 
 		type Bool struct {
@@ -800,6 +865,19 @@ func (p *Parser) run() (wtf error) {
 			return Dec{float64(i.i64)}
 		}
 
+		func (i Int) Iterate() Func {
+			step := int64(0)
+			limit := i.i64
+			return Func(func(t Tup) Tup {
+				if step < limit {
+					n := step
+					step++
+					return Tup{Int{n}}
+				}
+				return Tup{nil}
+			})
+		}
+
 		type Dec struct {
 			f64 float64
 		}
@@ -840,6 +918,55 @@ func (p *Parser) run() (wtf error) {
 
 		func (r Rune) Lib() *Map {
 			return libDef
+		}
+
+		type Time time.Time
+
+		func (t Time) Bool() Bool {
+			var z time.Time
+			return Bool{time.Time(t) != z}
+		}
+
+		func (t Time) Type() string {
+			return "time"
+		}
+
+		func (t Time) String() string {
+			return fmt.Sprintf("%v", time.Time(t))
+		}
+
+		func (t Time) Lib() *Map {
+			return libTime
+		}
+
+		type Ticker struct {
+			*time.Ticker
+		}
+
+		func NewTicker(d time.Duration) Ticker {
+			return Ticker{
+				time.NewTicker(d),
+			}
+		}
+
+		func (t Ticker) Bool() Bool {
+			return Bool{t.Ticker != nil}
+		}
+
+		func (t Ticker) Type() string {
+			return "ticker"
+		}
+
+		func (t Ticker) String() string {
+			return fmt.Sprintf("%v", t.Ticker)
+		}
+
+		func (t Ticker) Lib() *Map {
+			return libTick
+		}
+
+		func (t Ticker) Read() Any {
+			return Time(<-t.Ticker.C)
 		}
 
 		type MapData map[Any]Any
@@ -887,6 +1014,14 @@ func (p *Parser) run() (wtf error) {
 				if t.meta != nil {
 					if f, is := t.meta.(Func); is {
 						return f(Tup{t, key})[0]
+					}
+					if l, is := t.meta.(Tup); is {
+						for _, i := range l {
+							r := find(i, key)
+							if r != nil {
+								return r
+							}
+						}
 					}
 					if l, is := t.meta.(*List); is {
 						for _, i := range l.data {
@@ -1140,7 +1275,13 @@ func (p *Parser) run() (wtf error) {
 					return math.Abs(ad.Dec().f64-bd.Dec().f64) < 0.000001
 				}
 			}
-			panic(fmt.Errorf("invalid comparison (equal): %v %v", a, b))
+			return func() (rs bool) {
+				defer func() {
+					recover()
+				}()
+				rs = a == b
+				return
+			}()
 		}
 
 		func lt(a, b Any) bool {
@@ -1152,6 +1293,11 @@ func (p *Parser) run() (wtf error) {
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
 					return ad.Dec().f64 < bd.Dec().f64
+				}
+			}
+			if as, is := a.(Str); is {
+				if bs, is := b.(Str); is {
+					return strings.Compare(as.s, bs.s) < 0
 				}
 			}
 			panic(fmt.Errorf("invalid comparison (less): %v %v", a, b))
@@ -1193,15 +1339,33 @@ func (p *Parser) run() (wtf error) {
 			return rr
 		}
 
+		func one(a Any) Any {
+			if t, is := a.(Tup); is {
+				return get(t, 0)
+			}
+			return a
+		}
+
 		func get(aa Tup, i int) Any {
-			if i < len(aa) {
+			if aa != nil && i < len(aa) {
 				return aa[i]
 			}
 			return nil
 		}
 
-		func call(f Any, aa Tup) Any {
+		type funcReturn Tup
+
+		func call(f Any, aa Tup) (rs Any) {
 			if fn, is := f.(Func); is {
+				defer func() {
+					if r := recover(); r != nil {
+						if fr, is := r.(funcReturn); is {
+							rs = Tup(fr)
+							return
+						}
+						panic(r)
+					}
+				}()
 				return fn(aa)
 			}
 			panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
@@ -1221,6 +1385,36 @@ func (p *Parser) run() (wtf error) {
 		func store(t Any, key Any, val Any) Any {
 			t.(*Map).Set(key, val)
 			return val
+		}
+
+		func iterate(o Any) Func {
+			if oi, is := o.(IterIsh); is {
+				return oi.Iterate()
+			}
+			if oi := trymethod(o, "iterate", nil); oi != nil {
+				return oi.(Func)
+			}
+			panic(fmt.Sprintf("not iterable: %v", o))
+		}
+
+		type loopBreak int
+
+		func loop(fn func()) {
+			defer func() {
+				if r := recover(); r != nil {
+					if _, is := r.(loopBreak); is {
+						return
+					}
+					panic(r)
+				}
+			}()
+
+			fn()
+		}
+
+		func block(fn func()) Tup {
+			fn()
+			return nil
 		}
 
 		func trymethod(t Any, k string, def Any) Any {
@@ -1256,29 +1450,25 @@ func (p *Parser) run() (wtf error) {
 			return Tup{NewGroup()}
 		})
 
-		var Nlen Any = Func(func(t Tup) Tup {
-			s := get(t, 0).(LenIsh)
-			return Tup{Int{s.Len()}}
-		})
+		var Ntime *Map
 
 		var Ntype Any = Func(func(t Tup) Tup {
 			return Tup{Str{get(t, 0).Type()}}
 		})
 
-		var Nstring Any = Func(func(t Tup) Tup {
-			return Tup{Str{fmt.Sprintf("%v", get(t, 0))}}
-		})
-
-		var Nlib Any = Func(func(t Tup) Tup {
-			return Tup{get(t, 0).Lib()}
-		})
-
 		func init() {
 			libDef = NewMap(MapData{
-				Str{"len"}: Nlen,
-				Str{"lib"}: Nlib,
+				Str{"len"}: Func(func(t Tup) Tup {
+					s := get(t, 0).(LenIsh)
+					return Tup{Int{s.Len()}}
+				}),
+				Str{"lib"}: Func(func(t Tup) Tup {
+					return Tup{get(t, 0).Lib()}
+				}),
 				Str{"type"}: Ntype,
-				Str{"string"}: Nstring,
+				Str{"string"}: Func(func(t Tup) Tup {
+					return Tup{Str{fmt.Sprintf("%v", get(t, 0))}}
+				}),
 			})
 			libMap = NewMap(MapData{
 				Str{"keys"}: Func(func(t Tup) Tup {
@@ -1290,33 +1480,14 @@ func (p *Parser) run() (wtf error) {
 				}),
 				Str{"set"}: Func(func(t Tup) Tup {
 					get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
-					return Tup{get(t, 1), get(t, 2)}
+					return Tup{get(t, 0)}
 				}),
 				Str{"get"}: Func(func(t Tup) Tup {
 					return Tup{get(t, 0).(*Map).Get(get(t, 1))}
 				}),
-				Str{"setmeta"}: Func(func(t Tup) Tup {
-					get(t, 0).(*Map).meta = get(t, 1)
-					return Tup{get(t, 1)}
-				}),
-				Str{"getmeta"}: Func(func(t Tup) Tup {
-					return Tup{get(t, 0).(*Map).meta}
-				}),
-				Str{"iterate"}: Func(func(t Tup) Tup {
-					m := get(t, 0).(*Map)
-					keys := []Any{}
-					for k, _ := range m.data {
-						keys = append(keys, k)
-					}
-					n := 0
-					return Tup{Func(func(tt Tup) Tup {
-						k := get(keys, n)
-						n = n+1
-						if k != nil {
-							return Tup{k, m.Get(k)}
-						}
-						return Tup{nil, nil}
-					})}
+				Str{"chain"}: Func(func(t Tup) Tup {
+					get(t, 0).(*Map).meta = t[1:]
+					return Tup{get(t, 0)}
 				}),
 			})
 			libMap.meta = libDef
@@ -1353,15 +1524,6 @@ func (p *Parser) run() (wtf error) {
 				Str{"get"}: Func(func(t Tup) Tup {
 					return Tup{get(t, 0).(*List).Get(get(t, 1))}
 				}),
-				Str{"iterate"}: Func(func(t Tup) Tup {
-					l := get(t, 0).(*List)
-					n := 0
-					return Tup{Func(func(tt Tup) Tup {
-						v := get(l.data, n)
-						n = n+1
-						return Tup{v}
-					})}
-				}),
 			})
 			libList.meta = libDef
 			libChan = NewMap(MapData{
@@ -1379,12 +1541,6 @@ func (p *Parser) run() (wtf error) {
 					c := get(t, 0).(Chan)
 					close(c)
 					return nil
-				}),
-				Str{"iterate"}: Func(func(t Tup) Tup {
-					c := get(t, 0).(Chan)
-					return Tup{Func(func(tt Tup) Tup {
-						return Tup{<-c}
-					})}
 				}),
 			})
 			libChan.meta = libDef
@@ -1412,24 +1568,24 @@ func (p *Parser) run() (wtf error) {
 					}
 					return Tup{NewList(l)}
 				}),
-				Str{"iterate"}: Func(func(t Tup) Tup {
-					s := tostring(get(t, 0))
-					chars := []rune{}
-					for _, c := range s {
-						chars = append(chars, c)
-					}
-					n := 0
-					return Tup{Func(func(tt Tup) Tup {
-						if len(chars) > n {
-							v := Rune(chars[n])
-							n = n+1
-							return Tup{v}
-						}
-						return Tup{nil}
-					})}
-				}),
 			})
 			libStr.meta = libDef
+			libTick = NewMap(MapData{
+				Str{"read"}: Func(func(t Tup) Tup {
+					ti := get(t, 0).(Ticker)
+					return Tup{ti.Read()}
+				}),
+			})
+			libTick.meta = libDef
+			libTime = NewMap(MapData{
+				Str{"ms"}: Int{int64(time.Millisecond)},
+				Str{"ticker"}: Func(func(t Tup) Tup {
+					d := get(t, 0).(Int).i64
+					return Tup{NewTicker(time.Duration(d))}
+				}),
+			})
+			libTime.meta = libDef
+			Ntime = libTime
 		}
 
 	`)

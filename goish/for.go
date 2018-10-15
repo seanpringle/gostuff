@@ -4,88 +4,34 @@ import (
 	"fmt"
 )
 
-type NodeFor struct {
-	flag Node
+type NodeLoop struct {
 	body Node
 }
 
-func NewNodeFor(flag, body Node) *NodeFor {
+func (nl *NodeLoop) Format() string {
+	return fmt.Sprintf("loop(func() Tup { %s; return Tup{nil} })", nl.body.Format())
+}
+
+func (nl *NodeLoop) String() string {
+	return fmt.Sprintf("NodeLoop{%s}", nl.body)
+}
+
+type NodeFor struct {
+	item Node
+	body Node
+}
+
+func NewNodeFor(item, body Node) *NodeFor {
 	return &NodeFor{
-		flag: flag,
+		item: item,
 		body: body,
 	}
 }
 
 func (nf *NodeFor) Format() string {
-	return fmt.Sprintf("for truth(%s) { %s }", nf.flag.Format(), nf.body.Format())
+	return fmt.Sprintf("loop(func() { it := iterate(%s); for { t := it(nil); if get(t, 0) == nil { break }; call(%s, t); } })", nf.item.Format(), nf.body.Format())
 }
 
 func (nf *NodeFor) String() string {
-	return fmt.Sprintf("NodeFor{%s:%s}", nf.flag, nf.body)
-}
-
-type NodeFor2 struct {
-	begin Node
-	step  Node
-	body  Node
-}
-
-func NewNodeFor2(begin, step, body Node) *NodeFor2 {
-	return &NodeFor2{begin, step, body}
-}
-
-func (nf *NodeFor2) Format() string {
-	return fmt.Sprintf("for %s; truth(%s); { %s }",
-		nf.begin.Format(),
-		nf.step.Format(),
-		nf.body.Format(),
-	)
-}
-
-func (nf *NodeFor2) String() string {
-	return fmt.Sprintf("NodeFor2{%s;%s;%s}", nf.begin, nf.step, nf.body)
-}
-
-type NodeFor3 struct {
-	begin Node
-	check Node
-	step  Node
-	body  Node
-}
-
-func NewNodeFor3(begin, check, step, body Node) *NodeFor3 {
-	return &NodeFor3{begin, check, step, body}
-}
-
-func (nf *NodeFor3) Format() string {
-	return fmt.Sprintf("for %s; truth(%s); %s { %s }",
-		nf.begin.Format(),
-		nf.check.Format(),
-		nf.step.Format(),
-		nf.body.Format(),
-	)
-}
-
-func (nf *NodeFor3) String() string {
-	return fmt.Sprintf("NodeFor3{%s;%s;%s;%s}", nf.begin, nf.check, nf.step, nf.body)
-}
-
-type NodeForIn struct {
-	iter Node
-	body Node
-}
-
-func NewNodeForIn(iter, body Node) *NodeForIn {
-	return &NodeForIn{iter, body}
-}
-
-func (nf *NodeForIn) Format() string {
-	return fmt.Sprintf("func() { i := get(join(%s), 0).(Func); for truth(i()) { %s } }()",
-		nf.iter.Format(),
-		nf.body.Format(),
-	)
-}
-
-func (nf *NodeForIn) String() string {
-	return fmt.Sprintf("NodeForIn{%s;%s}", nf.iter, nf.body)
+	return fmt.Sprintf("NodeFor{%s:%s}", nf.item, nf.body)
 }

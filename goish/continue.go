@@ -8,7 +8,7 @@ func NewNodeContinue() *NodeContinue {
 }
 
 func (nr *NodeContinue) Format() string {
-	return "continue"
+	return "return" // NodeLoop
 }
 
 func (nr *NodeContinue) String() string {

@@ -2,12 +2,23 @@ a, b = print(1,"hi")
 print(1 and 0 or 3)
 print(5+6)
 
-inc = function(a) do return a+1 end
+inc = function(a)
+	return a+1
+end
+
 print(inc(42))
 
 print(a == 1 and 7 or 9)
 
-t = { a = 1, "__*&^" = 2, c = { d = function() do return "hello world" end}}
+t = {
+	a = 1,
+	"__*&^" = 2,
+	c = {
+		d = function()
+			return "hello world"
+		end
+	}
+}
 
 print(t.c.d())
 t.a = 42
@@ -18,12 +29,12 @@ print("\n", t:keys())
 print(2*2+3)
 
 t = {
-	g = function() do
+	g = function()
 		return "hello world"
 	end,
 }
 
-t.m = function(self) do
+t.m = function(self)
 	return self:g()
 end
 
@@ -48,7 +59,6 @@ a:set(b, 2)
 print(a, "\n")
 b:set("2", 2)
 print(a, "\n")
-print(a:getmeta(), "\n")
 
 l = [1, 2, 3]
 print(l, "\n")
@@ -74,7 +84,7 @@ print(c:read())
 print(c:read())
 print(c:read())
 
-hi = function(g) do
+hi = function(g)
 	print("hi\n")
 end
 
@@ -87,44 +97,38 @@ print("done\n")
 
 print(b:get("hi"))
 
+print(true and "yes" or "no")
+
 true = 0 < 1
 false = 1 < 0
 nil = []:pop()
 
-iter = function(list) do
-	t = { pos = 0 }
-	return function() do
-		v = list:get(t.pos)
-		t.pos = t.pos + 1
-		return v
+for 10 do(i)
+	print(i, "\n")
+end
+
+list = []:lib()
+
+print(list, "\n")
+
+list.iterate = function(self)
+	i = 0
+	return do
+		l = self:len()
+		if i < l then
+			i = i+1
+			print("len ", l, " ", i, " ", self:get(i-1), "\n")
+			return i, self:get(i-1)
+		end
 	end
 end
 
-for it = iter([1,2,3]); i = it() do
-	print(i, "\n")
-end
+print(list, "\n")
+fn = [1,2,3]:iterate()
+print(fn(), "\n")
+print(fn(), "\n")
+print(fn(), "\n")
 
-for it = [4,5,6]:iterate(); i = it() do
-	print(i, "\n")
-end
-
-print("\n")
-
-print(true and "yes" or "no")
-
-for i = 0; i < 10; i = i + 1 do
-	print(i, "\n")
-end
-
-print(
-	function() do return [1,2,3] end(),
-	function() do return [4,5,6] end(),
-)
-
-for it = { a = 1, b = 2, c = 3 }:iterate(); k, v = it() do
-	print(k, " ", v, "\n")
-end
-
-for it = "abc":iterate(); c = it() do
-	print(c, "\n")
-end
+--for [1,2,3] do(i, v)
+--	print(i, ":", v, "\n")
+--end

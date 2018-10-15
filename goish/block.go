@@ -40,11 +40,14 @@ func (nb *NodeBlock) Define(v *NodeVar) {
 }
 
 func (nb *NodeBlock) Format() string {
+	//if nb.scope == nil {
+	//	return nb.expr.FormatJoin("\n")
+	//}
 	scope := []string{}
 	for _, n := range nb.scope {
 		scope = append(scope, n.Format())
 	}
-	return fmt.Sprintf("func() Tup {\n %s; %s\n return Tup{nil} }()",
+	return fmt.Sprintf("block(func() { %s; %s })",
 		strings.Join(scope, "\n"),
 		nb.expr.FormatJoin("\n"),
 	)

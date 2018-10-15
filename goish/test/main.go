@@ -5,6 +5,7 @@ import "math"
 import "strings"
 import "strconv"
 import "sync"
+import "time"
 
 type Any interface {
 	Type() string
@@ -18,6 +19,8 @@ var libList *Map
 var libStr *Map
 var libChan *Map
 var libGroup *Map
+var libTime *Map
+var libTick *Map
 
 type Stringer = fmt.Stringer
 
@@ -73,6 +76,10 @@ type DecIsh interface {
 
 type LenIsh interface {
 	Len() int64
+}
+
+type IterIsh interface {
+	Iterate() Func
 }
 
 type Bool struct {
@@ -154,6 +161,19 @@ func (i Int) Dec() Dec {
 	return Dec{float64(i.i64)}
 }
 
+func (i Int) Iterate() Func {
+	step := int64(0)
+	limit := i.i64
+	return Func(func(t Tup) Tup {
+		if step < limit {
+			n := step
+			step++
+			return Tup{Int{n}}
+		}
+		return Tup{nil}
+	})
+}
+
 type Dec struct {
 	f64 float64
 }
@@ -194,6 +214,55 @@ func (r Rune) String() string {
 
 func (r Rune) Lib() *Map {
 	return libDef
+}
+
+type Time time.Time
+
+func (t Time) Bool() Bool {
+	var z time.Time
+	return Bool{time.Time(t) != z}
+}
+
+func (t Time) Type() string {
+	return "time"
+}
+
+func (t Time) String() string {
+	return fmt.Sprintf("%v", time.Time(t))
+}
+
+func (t Time) Lib() *Map {
+	return libTime
+}
+
+type Ticker struct {
+	*time.Ticker
+}
+
+func NewTicker(d time.Duration) Ticker {
+	return Ticker{
+		time.NewTicker(d),
+	}
+}
+
+func (t Ticker) Bool() Bool {
+	return Bool{t.Ticker != nil}
+}
+
+func (t Ticker) Type() string {
+	return "ticker"
+}
+
+func (t Ticker) String() string {
+	return fmt.Sprintf("%v", t.Ticker)
+}
+
+func (t Ticker) Lib() *Map {
+	return libTick
+}
+
+func (t Ticker) Read() Any {
+	return Time(<-t.Ticker.C)
 }
 
 type MapData map[Any]Any
@@ -241,6 +310,14 @@ func (t *Map) Find(key Any) Any {
 		if t.meta != nil {
 			if f, is := t.meta.(Func); is {
 				return f(Tup{t, key})[0]
+			}
+			if l, is := t.meta.(Tup); is {
+				for _, i := range l {
+					r := find(i, key)
+					if r != nil {
+						return r
+					}
+				}
 			}
 			if l, is := t.meta.(*List); is {
 				for _, i := range l.data {
@@ -494,7 +571,13 @@ func eq(a, b Any) bool {
 			return math.Abs(ad.Dec().f64-bd.Dec().f64) < 0.000001
 		}
 	}
-	panic(fmt.Errorf("invalid comparison (equal): %v %v", a, b))
+	return func() (rs bool) {
+		defer func() {
+			recover()
+		}()
+		rs = a == b
+		return
+	}()
 }
 
 func lt(a, b Any) bool {
@@ -506,6 +589,11 @@ func lt(a, b Any) bool {
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
 			return ad.Dec().f64 < bd.Dec().f64
+		}
+	}
+	if as, is := a.(Str); is {
+		if bs, is := b.(Str); is {
+			return strings.Compare(as.s, bs.s) < 0
 		}
 	}
 	panic(fmt.Errorf("invalid comparison (less): %v %v", a, b))
@@ -547,15 +635,33 @@ func join(aa ...Any) Tup {
 	return rr
 }
 
+func one(a Any) Any {
+	if t, is := a.(Tup); is {
+		return get(t, 0)
+	}
+	return a
+}
+
 func get(aa Tup, i int) Any {
-	if i < len(aa) {
+	if aa != nil && i < len(aa) {
 		return aa[i]
 	}
 	return nil
 }
 
-func call(f Any, aa Tup) Any {
+type funcReturn Tup
+
+func call(f Any, aa Tup) (rs Any) {
 	if fn, is := f.(Func); is {
+		defer func() {
+			if r := recover(); r != nil {
+				if fr, is := r.(funcReturn); is {
+					rs = Tup(fr)
+					return
+				}
+				panic(r)
+			}
+		}()
 		return fn(aa)
 	}
 	panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
@@ -575,6 +681,36 @@ func method(t Any, key Any) (Any, Any) {
 func store(t Any, key Any, val Any) Any {
 	t.(*Map).Set(key, val)
 	return val
+}
+
+func iterate(o Any) Func {
+	if oi, is := o.(IterIsh); is {
+		return oi.Iterate()
+	}
+	if oi := trymethod(o, "iterate", nil); oi != nil {
+		return oi.(Func)
+	}
+	panic(fmt.Sprintf("not iterable: %v", o))
+}
+
+type loopBreak int
+
+func loop(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, is := r.(loopBreak); is {
+				return
+			}
+			panic(r)
+		}
+	}()
+
+	fn()
+}
+
+func block(fn func()) Tup {
+	fn()
+	return nil
 }
 
 func trymethod(t Any, k string, def Any) Any {
@@ -610,29 +746,25 @@ var Ngroup Any = Func(func(t Tup) Tup {
 	return Tup{NewGroup()}
 })
 
-var Nlen Any = Func(func(t Tup) Tup {
-	s := get(t, 0).(LenIsh)
-	return Tup{Int{s.Len()}}
-})
+var Ntime *Map
 
 var Ntype Any = Func(func(t Tup) Tup {
 	return Tup{Str{get(t, 0).Type()}}
 })
 
-var Nstring Any = Func(func(t Tup) Tup {
-	return Tup{Str{fmt.Sprintf("%v", get(t, 0))}}
-})
-
-var Nlib Any = Func(func(t Tup) Tup {
-	return Tup{get(t, 0).Lib()}
-})
-
 func init() {
 	libDef = NewMap(MapData{
-		Str{"len"}:    Nlen,
-		Str{"lib"}:    Nlib,
-		Str{"type"}:   Ntype,
-		Str{"string"}: Nstring,
+		Str{"len"}: Func(func(t Tup) Tup {
+			s := get(t, 0).(LenIsh)
+			return Tup{Int{s.Len()}}
+		}),
+		Str{"lib"}: Func(func(t Tup) Tup {
+			return Tup{get(t, 0).Lib()}
+		}),
+		Str{"type"}: Ntype,
+		Str{"string"}: Func(func(t Tup) Tup {
+			return Tup{Str{fmt.Sprintf("%v", get(t, 0))}}
+		}),
 	})
 	libMap = NewMap(MapData{
 		Str{"keys"}: Func(func(t Tup) Tup {
@@ -644,33 +776,14 @@ func init() {
 		}),
 		Str{"set"}: Func(func(t Tup) Tup {
 			get(t, 0).(*Map).Set(get(t, 1), get(t, 2))
-			return Tup{get(t, 1), get(t, 2)}
+			return Tup{get(t, 0)}
 		}),
 		Str{"get"}: Func(func(t Tup) Tup {
 			return Tup{get(t, 0).(*Map).Get(get(t, 1))}
 		}),
-		Str{"setmeta"}: Func(func(t Tup) Tup {
-			get(t, 0).(*Map).meta = get(t, 1)
-			return Tup{get(t, 1)}
-		}),
-		Str{"getmeta"}: Func(func(t Tup) Tup {
-			return Tup{get(t, 0).(*Map).meta}
-		}),
-		Str{"iterate"}: Func(func(t Tup) Tup {
-			m := get(t, 0).(*Map)
-			keys := []Any{}
-			for k, _ := range m.data {
-				keys = append(keys, k)
-			}
-			n := 0
-			return Tup{Func(func(tt Tup) Tup {
-				k := get(keys, n)
-				n = n + 1
-				if k != nil {
-					return Tup{k, m.Get(k)}
-				}
-				return Tup{nil, nil}
-			})}
+		Str{"chain"}: Func(func(t Tup) Tup {
+			get(t, 0).(*Map).meta = t[1:]
+			return Tup{get(t, 0)}
 		}),
 	})
 	libMap.meta = libDef
@@ -707,15 +820,6 @@ func init() {
 		Str{"get"}: Func(func(t Tup) Tup {
 			return Tup{get(t, 0).(*List).Get(get(t, 1))}
 		}),
-		Str{"iterate"}: Func(func(t Tup) Tup {
-			l := get(t, 0).(*List)
-			n := 0
-			return Tup{Func(func(tt Tup) Tup {
-				v := get(l.data, n)
-				n = n + 1
-				return Tup{v}
-			})}
-		}),
 	})
 	libList.meta = libDef
 	libChan = NewMap(MapData{
@@ -733,12 +837,6 @@ func init() {
 			c := get(t, 0).(Chan)
 			close(c)
 			return nil
-		}),
-		Str{"iterate"}: Func(func(t Tup) Tup {
-			c := get(t, 0).(Chan)
-			return Tup{Func(func(tt Tup) Tup {
-				return Tup{<-c}
-			})}
 		}),
 	})
 	libChan.meta = libDef
@@ -766,46 +864,43 @@ func init() {
 			}
 			return Tup{NewList(l)}
 		}),
-		Str{"iterate"}: Func(func(t Tup) Tup {
-			s := tostring(get(t, 0))
-			chars := []rune{}
-			for _, c := range s {
-				chars = append(chars, c)
-			}
-			n := 0
-			return Tup{Func(func(tt Tup) Tup {
-				if len(chars) > n {
-					v := Rune(chars[n])
-					n = n + 1
-					return Tup{v}
-				}
-				return Tup{nil}
-			})}
-		}),
 	})
 	libStr.meta = libDef
+	libTick = NewMap(MapData{
+		Str{"read"}: Func(func(t Tup) Tup {
+			ti := get(t, 0).(Ticker)
+			return Tup{ti.Read()}
+		}),
+	})
+	libTick.meta = libDef
+	libTime = NewMap(MapData{
+		Str{"ms"}: Int{int64(time.Millisecond)},
+		Str{"ticker"}: Func(func(t Tup) Tup {
+			d := get(t, 0).(Int).i64
+			return Tup{NewTicker(time.Duration(d))}
+		}),
+	})
+	libTime.meta = libDef
+	Ntime = libTime
 }
 
 func main() {
-	func() Tup {
-		var Nt Any
-		var Ng Any
-		var Nit Any
-		var Nk Any
+	block(func() {
+		var Na Any
+		var Nlen Any
+		var Nhi Any
+		var Nlist Any
 		var Nb Any
 		var Nl Any
-		var Niter Any
-		var Na Any
-		var Nc Any
+		var Ng Any
+		var Nfn Any
+		var Ninc Any
+		var Ntrue Any
 		var Nfalse Any
 		var Nnil Any
-		var Ni Any
-		var Nv Any
-		var Nlen Any
+		var Nt Any
 		var Ns Any
-		var Nhi Any
-		var Ntrue Any
-		var Ninc Any
+		var Nc Any
 		func() Tup {
 			aa := join(call(Nprint, join(Int{1}, Str{"hi"})))
 			Na = get(aa, 0)
@@ -831,15 +926,12 @@ func main() {
 			}
 			return a
 		}()))
-		call(Nprint, join(add(Int{5}, Int{6})))
+		call(Nprint, join(add(one(Int{5}), one(Int{6}))))
 		func() Tup {
 			aa := join(Func(func(aa Tup) Tup {
 				Na := get(aa, 0)
 				noop(Na)
-				return func() Tup {
-					return join(add(Na, Int{1}))
-					return Tup{nil}
-				}()
+				return block(func() { ; panic(funcReturn(join(add(one(Na), one(Int{1}))))) })
 			}))
 			Ninc = get(aa, 0)
 			return aa
@@ -849,7 +941,7 @@ func main() {
 			var a Any
 			a = func() Any {
 				var a Any
-				a = Bool{eq(Na, Int{1})}
+				a = Bool{eq(one(Na), one(Int{1}))}
 				if truth(a) {
 					var b Any
 					b = Int{7}
@@ -865,12 +957,7 @@ func main() {
 			return a
 		}()))
 		func() Tup {
-			aa := join(NewMap(MapData{Str{"__*&^"}: Int{2}, Str{"c"}: NewMap(MapData{Str{"d"}: Func(func(aa Tup) Tup {
-				return func() Tup {
-					return join(Str{"hello world"})
-					return Tup{nil}
-				}()
-			})}), Str{"a"}: Int{1}}))
+			aa := join(NewMap(MapData{Str{"a"}: Int{1}, Str{"__*&^"}: Int{2}, Str{"c"}: NewMap(MapData{Str{"d"}: Func(func(aa Tup) Tup { ; return block(func() { ; panic(funcReturn(join(Str{"hello world"}))) }) })})}))
 			Nt = get(aa, 0)
 			return aa
 		}()
@@ -878,14 +965,9 @@ func main() {
 		func() Tup { aa := join(Int{42}); store(Nt, Str{"a"}, get(aa, 0)); return aa }()
 		call(Nprint, join(Nt))
 		call(Nprint, join(Str{"\n"}, func() Any { t, m := method(Nt, Str{"keys"}); return call(m, join(t)) }()))
-		call(Nprint, join(add(mul(Int{2}, Int{2}), Int{3})))
+		call(Nprint, join(add(one(mul(one(Int{2}), one(Int{2}))), one(Int{3}))))
 		func() Tup {
-			aa := join(NewMap(MapData{Str{"g"}: Func(func(aa Tup) Tup {
-				return func() Tup {
-					return join(Str{"hello world"})
-					return Tup{nil}
-				}()
-			})}))
+			aa := join(NewMap(MapData{Str{"g"}: Func(func(aa Tup) Tup { ; return block(func() { ; panic(funcReturn(join(Str{"hello world"}))) }) })}))
 			Nt = get(aa, 0)
 			return aa
 		}()
@@ -893,10 +975,9 @@ func main() {
 			aa := join(Func(func(aa Tup) Tup {
 				Nself := get(aa, 0)
 				noop(Nself)
-				return func() Tup {
-					return join(func() Any { t, m := method(Nself, Str{"g"}); return call(m, join(t)) }())
-					return Tup{nil}
-				}()
+				return block(func() {
+					panic(funcReturn(join(func() Any { t, m := method(Nself, Str{"g"}); return call(m, join(t)) }())))
+				})
 			}))
 			store(Nt, Str{"m"}, get(aa, 0))
 			return aa
@@ -916,14 +997,13 @@ func main() {
 		call(Nprint, join(Na, Str{"\n"}))
 		func() Any { t, m := method(Nb, Str{"set"}); return call(m, join(t, Str{"2"}, Int{2})) }()
 		call(Nprint, join(Na, Str{"\n"}))
-		call(Nprint, join(func() Any { t, m := method(Na, Str{"getmeta"}); return call(m, join(t)) }(), Str{"\n"}))
 		func() Tup { aa := join(NewList([]Any{Int{1}, Int{2}, Int{3}})); Nl = get(aa, 0); return aa }()
 		call(Nprint, join(Nl, Str{"\n"}))
 		func() Any { t, m := method(Nl, Str{"push"}); return call(m, join(t, Int{4})) }()
 		call(Nprint, join(Nl, Str{"\n"}))
 		call(Nprint, join(func() Any { t, m := method(Nl, Str{"pop"}); return call(m, join(t)) }()))
 		call(Nprint, join(Nl, Str{"\n"}))
-		call(Nprint, join(add(Str{"a"}, Str{"b"}), Str{"\n"}))
+		call(Nprint, join(add(one(Str{"a"}), one(Str{"b"})), Str{"\n"}))
 		func() Tup { aa := join(Str{"hi"}); Nlen = get(aa, 0); return aa }()
 		call(Nprint, join(Str{"yo"}, func() Any { t, m := method(Nl, Str{"len"}); return call(m, join(t)) }(), Str{"\n"}))
 		call(Nprint, join(func() Any { t, m := method(Str{"a,b,c"}, Str{"split"}); return call(m, join(t, Str{","})) }()))
@@ -942,10 +1022,7 @@ func main() {
 			aa := join(Func(func(aa Tup) Tup {
 				Ng := get(aa, 0)
 				noop(Ng)
-				return func() Tup {
-					call(Nprint, join(Str{"hi\n"}))
-					return Tup{nil}
-				}()
+				return block(func() { ; call(Nprint, join(Str{"hi\n"})) })
 			}))
 			Nhi = get(aa, 0)
 			return aa
@@ -957,67 +1034,6 @@ func main() {
 		func() Any { t, m := method(Ng, Str{"wait"}); return call(m, join(t)) }()
 		call(Nprint, join(Str{"done\n"}))
 		call(Nprint, join(func() Any { t, m := method(Nb, Str{"get"}); return call(m, join(t, Str{"hi"})) }()))
-		func() Tup { aa := join(Bool{lt(Int{0}, Int{1})}); Ntrue = get(aa, 0); return aa }()
-		func() Tup { aa := join(Bool{lt(Int{1}, Int{0})}); Nfalse = get(aa, 0); return aa }()
-		func() Tup {
-			aa := join(func() Any { t, m := method(NewList([]Any{}), Str{"pop"}); return call(m, join(t)) }())
-			Nnil = get(aa, 0)
-			return aa
-		}()
-		func() Tup {
-			aa := join(Func(func(aa Tup) Tup {
-				Nlist := get(aa, 0)
-				noop(Nlist)
-				return func() Tup {
-					var Nt Any
-					func() Tup { aa := join(NewMap(MapData{Str{"pos"}: Int{0}})); Nt = get(aa, 0); return aa }()
-					return join(Func(func(aa Tup) Tup {
-						return func() Tup {
-							var Nv Any
-							func() Tup {
-								aa := join(func() Any { t, m := method(Nlist, Str{"get"}); return call(m, join(t, find(Nt, Str{"pos"}))) }())
-								Nv = get(aa, 0)
-								return aa
-							}()
-							func() Tup {
-								aa := join(add(find(Nt, Str{"pos"}), Int{1}))
-								store(Nt, Str{"pos"}, get(aa, 0))
-								return aa
-							}()
-							return join(Nv)
-							return Tup{nil}
-						}()
-					}))
-					return Tup{nil}
-				}()
-			}))
-			Niter = get(aa, 0)
-			return aa
-		}()
-		for func() Tup {
-			aa := join(call(Niter, join(NewList([]Any{Int{1}, Int{2}, Int{3}}))))
-			Nit = get(aa, 0)
-			return aa
-		}(); truth(func() Tup { aa := join(call(Nit, join())); Ni = get(aa, 0); return aa }()); {
-			func() Tup {
-				call(Nprint, join(Ni, Str{"\n"}))
-				return Tup{nil}
-			}()
-		}
-		for func() Tup {
-			aa := join(func() Any {
-				t, m := method(NewList([]Any{Int{4}, Int{5}, Int{6}}), Str{"iterate"})
-				return call(m, join(t))
-			}())
-			Nit = get(aa, 0)
-			return aa
-		}(); truth(func() Tup { aa := join(call(Nit, join())); Ni = get(aa, 0); return aa }()); {
-			func() Tup {
-				call(Nprint, join(Ni, Str{"\n"}))
-				return Tup{nil}
-			}()
-		}
-		call(Nprint, join(Str{"\n"}))
 		call(Nprint, join(func() Any {
 			var a Any
 			a = func() Any {
@@ -1037,46 +1053,73 @@ func main() {
 			}
 			return a
 		}()))
-		for func() Tup { aa := join(Int{0}); Ni = get(aa, 0); return aa }(); truth(Bool{lt(Ni, Int{10})}); func() Tup { aa := join(add(Ni, Int{1})); Ni = get(aa, 0); return aa }() {
-			func() Tup {
-				call(Nprint, join(Ni, Str{"\n"}))
-				return Tup{nil}
-			}()
-		}
-		call(Nprint, join(call(Func(func(aa Tup) Tup {
-			return func() Tup {
-				return join(NewList([]Any{Int{1}, Int{2}, Int{3}}))
-				return Tup{nil}
-			}()
-		}), join()), call(Func(func(aa Tup) Tup {
-			return func() Tup {
-				return join(NewList([]Any{Int{4}, Int{5}, Int{6}}))
-				return Tup{nil}
-			}()
-		}), join())))
-		for func() Tup {
+		func() Tup { aa := join(Bool{lt(one(Int{0}), one(Int{1}))}); Ntrue = get(aa, 0); return aa }()
+		func() Tup { aa := join(Bool{lt(one(Int{1}), one(Int{0}))}); Nfalse = get(aa, 0); return aa }()
+		func() Tup {
+			aa := join(func() Any { t, m := method(NewList([]Any{}), Str{"pop"}); return call(m, join(t)) }())
+			Nnil = get(aa, 0)
+			return aa
+		}()
+		loop(func() {
+			it := iterate(Int{10})
+			for {
+				t := it(nil)
+				if get(t, 0) == nil {
+					break
+				}
+				call(Func(func(aa Tup) Tup {
+					Ni := get(aa, 0)
+					noop(Ni)
+					return block(func() { ; call(Nprint, join(Ni, Str{"\n"})) })
+				}), t)
+			}
+		})
+		func() Tup {
+			aa := join(func() Any { t, m := method(NewList([]Any{}), Str{"lib"}); return call(m, join(t)) }())
+			Nlist = get(aa, 0)
+			return aa
+		}()
+		call(Nprint, join(Nlist, Str{"\n"}))
+		func() Tup {
+			aa := join(Func(func(aa Tup) Tup {
+				Nself := get(aa, 0)
+				noop(Nself)
+				return block(func() {
+					var Ni Any
+					var Nl Any
+					func() Tup { aa := join(Int{0}); Ni = get(aa, 0); return aa }()
+					panic(funcReturn(join(Func(func(aa Tup) Tup {
+						return block(func() {
+							func() Tup {
+								aa := join(func() Any { t, m := method(Nself, Str{"len"}); return call(m, join(t)) }())
+								Nl = get(aa, 0)
+								return aa
+							}()
+							if truth(Bool{lt(one(Ni), one(Nl))}) {
+								block(func() {
+									func() Tup { aa := join(add(one(Ni), one(Int{1}))); Ni = get(aa, 0); return aa }()
+									call(Nprint, join(Str{"len "}, Nl, Str{" "}, Ni, Str{" "}, func() Any { t, m := method(Nself, Str{"get"}); return call(m, join(t, sub(Ni, Int{1}))) }(), Str{"\n"}))
+									panic(funcReturn(join(Ni, func() Any { t, m := method(Nself, Str{"get"}); return call(m, join(t, sub(Ni, Int{1}))) }())))
+								})
+							}
+						})
+					}))))
+				})
+			}))
+			store(Nlist, Str{"iterate"}, get(aa, 0))
+			return aa
+		}()
+		call(Nprint, join(Nlist, Str{"\n"}))
+		func() Tup {
 			aa := join(func() Any {
-				t, m := method(NewMap(MapData{Str{"a"}: Int{1}, Str{"b"}: Int{2}, Str{"c"}: Int{3}}), Str{"iterate"})
+				t, m := method(NewList([]Any{Int{1}, Int{2}, Int{3}}), Str{"iterate"})
 				return call(m, join(t))
 			}())
-			Nit = get(aa, 0)
+			Nfn = get(aa, 0)
 			return aa
-		}(); truth(func() Tup { aa := join(call(Nit, join())); Nk = get(aa, 0); Nv = get(aa, 1); return aa }()); {
-			func() Tup {
-				call(Nprint, join(Nk, Str{" "}, Nv, Str{"\n"}))
-				return Tup{nil}
-			}()
-		}
-		for func() Tup {
-			aa := join(func() Any { t, m := method(Str{"abc"}, Str{"iterate"}); return call(m, join(t)) }())
-			Nit = get(aa, 0)
-			return aa
-		}(); truth(func() Tup { aa := join(call(Nit, join())); Nc = get(aa, 0); return aa }()); {
-			func() Tup {
-				call(Nprint, join(Nc, Str{"\n"}))
-				return Tup{nil}
-			}()
-		}
-		return Tup{nil}
-	}()
+		}()
+		call(Nprint, join(call(Nfn, join()), Str{"\n"}))
+		call(Nprint, join(call(Nfn, join()), Str{"\n"}))
+		call(Nprint, join(call(Nfn, join()), Str{"\n"}))
+	})
 }

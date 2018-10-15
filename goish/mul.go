@@ -29,7 +29,7 @@ func (na *NodeMul) Precedence() int {
 }
 
 func (na *NodeMul) Format() string {
-	return fmt.Sprintf("mul(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("mul(one(%s), one(%s))", na.args[1].Format(), na.args[0].Format())
 }
 
 func (na *NodeMul) String() string {
