@@ -25,7 +25,7 @@ func (nf *NodeFunc) Format() string {
 	}
 
 	//return fmt.Sprintf("Func(func(aa Tup) Tup { %s; return func() Tup { %s; return Tup{nil}; }() })",
-	return fmt.Sprintf("Func(func(aa Tup) Tup { %s; return %s })",
+	return fmt.Sprintf("Func(func(aa Tup) Tup { %s; %s; return nil })",
 		strings.Join(init, ";"),
 		nf.body.Format(),
 	)

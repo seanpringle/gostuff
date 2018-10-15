@@ -16,7 +16,7 @@ func (nr *NodeReturn) Format() string {
 	if nr.node == nil {
 		return fmt.Sprintf("return")
 	}
-	return fmt.Sprintf("panic(funcReturn(join(%s)))", nr.node.Format())
+	return fmt.Sprintf("return join(%s)", nr.node.Format())
 }
 
 func (nr *NodeReturn) String() string {

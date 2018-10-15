@@ -8,7 +8,7 @@ func NewNodeBreak() *NodeBreak {
 }
 
 func (nr *NodeBreak) Format() string {
-	return "panic(loopBreak(0))"
+	return "loopbreak()"
 }
 
 func (nr *NodeBreak) String() string {

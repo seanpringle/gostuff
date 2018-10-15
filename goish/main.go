@@ -289,6 +289,12 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeAnd()
 	}
 
+	if p.scan() == '+' && p.char(1) == '+' {
+		p.take()
+		p.take()
+		return NewNodeInc()
+	}
+
 	if p.scan() == '+' {
 		p.take()
 		return NewNodeAdd()
@@ -400,7 +406,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		p.take()
 		p.take()
-		iter := p.expression(block)
+		iter := p.tuple(block, nil)
 		body := p.tuple(block, nil)
 		return NewNodeFor(iter, body)
 	}
@@ -524,7 +530,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 		if t != nil {
 			nodes = Nodes(t.(NodeTuple))
 		}
-		ensure(p.scan() == ']', "expected closing bracket (slice)")
+		ensure(p.scan() == ']', "expected closing bracket (list)")
 		p.take()
 		return NewNodeList(nodes)
 	}
@@ -554,17 +560,21 @@ func (p *Parser) expression(block *NodeBlock) Node {
 		}
 	}
 
-	var last Node
+	//var last Node
 
 	for node := p.node(block); node != nil; node = p.node(block) {
 
-		if ex, is := node.(*NodeExec); is {
-			if _, is := last.(Operator); is {
-				node = ex.args
-			}
-		}
+		//log.Println(len(items), len(ops), node)
+		//log.Println("\t", items)
+		//log.Println("\t", ops)
 
-		last = node
+		//if ex, is := node.(*NodeExec); is {
+		//	if _, is := last.(Operator); is {
+		//		node = ex.args
+		//	}
+		//}
+
+		//last = node
 
 		if op, is := node.(Operator); is {
 			shunt(op.Precedence())
@@ -578,11 +588,12 @@ func (p *Parser) expression(block *NodeBlock) Node {
 			consuming += op.(Operator).Consumes()
 		}
 
-		if consuming > len(items) {
+		if consuming > len(items)+len(ops)-1 {
 			continue
 		}
 
-		if p.scan() == ',' || p.scan() == '{' || p.scan() == '[' || p.terminator() {
+		//if p.scan() == ',' || p.scan() == '{' || p.scan() == '[' || p.terminator() {
+		if p.scan() == ',' || p.terminator() {
 			break
 		}
 
@@ -782,10 +793,6 @@ func (p *Parser) run() (wtf error) {
 			Len() int64
 		}
 
-		type IterIsh interface {
-			Iterate() Func
-		}
-
 		type Bool struct {
 			b bool
 		}
@@ -863,19 +870,6 @@ func (p *Parser) run() (wtf error) {
 
 		func (i Int) Dec() Dec {
 			return Dec{float64(i.i64)}
-		}
-
-		func (i Int) Iterate() Func {
-			step := int64(0)
-			limit := i.i64
-			return Func(func(t Tup) Tup {
-				if step < limit {
-					n := step
-					step++
-					return Tup{Int{n}}
-				}
-				return Tup{nil}
-			})
 		}
 
 		type Dec struct {
@@ -1353,19 +1347,8 @@ func (p *Parser) run() (wtf error) {
 			return nil
 		}
 
-		type funcReturn Tup
-
 		func call(f Any, aa Tup) (rs Any) {
 			if fn, is := f.(Func); is {
-				defer func() {
-					if r := recover(); r != nil {
-						if fr, is := r.(funcReturn); is {
-							rs = Tup(fr)
-							return
-						}
-						panic(r)
-					}
-				}()
 				return fn(aa)
 			}
 			panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
@@ -1388,21 +1371,22 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func iterate(o Any) Func {
-			if oi, is := o.(IterIsh); is {
-				return oi.Iterate()
-			}
 			if oi := trymethod(o, "iterate", nil); oi != nil {
 				return oi.(Func)
 			}
 			panic(fmt.Sprintf("not iterable: %v", o))
 		}
 
-		type loopBreak int
+		type loopBroke int
+
+		func loopbreak() {
+			panic(loopBroke(0))
+		}
 
 		func loop(fn func()) {
 			defer func() {
 				if r := recover(); r != nil {
-					if _, is := r.(loopBreak); is {
+					if _, is := r.(loopBroke); is {
 						return
 					}
 					panic(r)
@@ -1410,11 +1394,6 @@ func (p *Parser) run() (wtf error) {
 			}()
 
 			fn()
-		}
-
-		func block(fn func()) Tup {
-			fn()
-			return nil
 		}
 
 		func trymethod(t Any, k string, def Any) Any {
@@ -1434,9 +1413,11 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		var Nprint Any = Func(func(aa Tup) Tup {
+			parts := []string{}
 			for _, a := range aa {
-				fmt.Printf("%s", tostring(a))
+				parts = append(parts, tostring(a))
 			}
+			fmt.Printf("%s\n", strings.Join(parts, " "))
 			return aa
 		})
 
@@ -1456,14 +1437,26 @@ func (p *Parser) run() (wtf error) {
 			return Tup{Str{get(t, 0).Type()}}
 		})
 
+		var Nsetprototype Any = Func(func(t Tup) Tup {
+			if m, is := get(t, 0).(*Map); is {
+				m.meta = get(t, 1)
+				return nil
+			}
+			panic(fmt.Sprintf("cannot set prototype"))
+		})
+
+		var Ngetprototype Any = Func(func(t Tup) Tup {
+			if m, is := get(t, 0).(*Map); is {
+				return Tup{m.meta}
+			}
+			return Tup{get(t, 0).Lib()}
+		})
+
 		func init() {
 			libDef = NewMap(MapData{
 				Str{"len"}: Func(func(t Tup) Tup {
 					s := get(t, 0).(LenIsh)
 					return Tup{Int{s.Len()}}
-				}),
-				Str{"lib"}: Func(func(t Tup) Tup {
-					return Tup{get(t, 0).Lib()}
 				}),
 				Str{"type"}: Ntype,
 				Str{"string"}: Func(func(t Tup) Tup {
@@ -1484,10 +1477,6 @@ func (p *Parser) run() (wtf error) {
 				}),
 				Str{"get"}: Func(func(t Tup) Tup {
 					return Tup{get(t, 0).(*Map).Get(get(t, 1))}
-				}),
-				Str{"chain"}: Func(func(t Tup) Tup {
-					get(t, 0).(*Map).meta = t[1:]
-					return Tup{get(t, 0)}
 				}),
 			})
 			libMap.meta = libDef

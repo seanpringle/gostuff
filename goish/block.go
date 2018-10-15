@@ -47,7 +47,7 @@ func (nb *NodeBlock) Format() string {
 	for _, n := range nb.scope {
 		scope = append(scope, n.Format())
 	}
-	return fmt.Sprintf("block(func() { %s; %s })",
+	return fmt.Sprintf("{ %s; %s }",
 		strings.Join(scope, "\n"),
 		nb.expr.FormatJoin("\n"),
 	)
