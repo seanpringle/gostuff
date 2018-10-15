@@ -1,4 +1,4 @@
-a, b = print(1,"hi")
+print(a, b = print(1,"hi"))
 print(1 and 0 or 3)
 print(5+6)
 
@@ -24,7 +24,7 @@ print(t.c.d())
 t.a = 42
 print(t)
 
-print("\n", t:keys())
+print("", t:keys())
 
 print(2*2+3)
 
@@ -43,34 +43,32 @@ print(t:m())
 s = "goodbye world"
 
 print(s:len())
-print(s:type())
+print(type(s))
 
 print([1,2,7])
 
-print("\n")
-
 a = {}
-print(a, "\n")
+print(a)
 a:set("1", 1)
-print(a, "\n")
+print(a)
 
 b = {}
 a:set(b, 2)
-print(a, "\n")
+print(a)
 b:set("2", 2)
-print(a, "\n")
+print(a)
 
 l = [1, 2, 3]
-print(l, "\n")
+print(l)
 l:push(4)
-print(l, "\n")
+print(l)
 print(l:pop())
-print(l, "\n")
+print(l)
 
-print("a" + "b", "\n")
+print("a" + "b")
 
 len = "hi"
-print("yo", l:len(), "\n")
+print("yo", l:len())
 
 print("a,b,c":split(","))
 print("a,b,c":split(","):join(":"))
@@ -85,7 +83,7 @@ print(c:read())
 print(c:read())
 
 hi = function(g)
-	print("hi\n")
+	print("hi")
 end
 
 g = group()
@@ -93,7 +91,7 @@ g:run(hi)
 g:run(hi)
 g:run(hi)
 g:wait()
-print("done\n")
+print("done")
 
 print(b:get("hi"))
 
@@ -103,32 +101,62 @@ true = 0 < 1
 false = 1 < 0
 nil = []:pop()
 
-for 10 do(i)
-	print(i, "\n")
-end
-
-list = []:lib()
-
-print(list, "\n")
-
-list.iterate = function(self)
-	i = 0
-	return do
-		l = self:len()
-		if i < l then
-			i = i+1
-			print("len ", l, " ", i, " ", self:get(i-1), "\n")
-			return i, self:get(i-1)
+function(proto)
+	proto.iterate = function(self)
+		i = 0
+		return do
+			if i < self then
+				return i++
+			end
 		end
 	end
+end(getprototype(0))
+
+for 10 do(i)
+	print(i)
 end
 
-print(list, "\n")
-fn = [1,2,3]:iterate()
-print(fn(), "\n")
-print(fn(), "\n")
-print(fn(), "\n")
+function(list)
+	list.iterate = function(self)
+		i = 0
+		return do
+			if i < self:len() then
+				return i++, self:get(i-1)
+			end
+		end
+	end
+end(getprototype([]))
 
---for [1,2,3] do(i, v)
---	print(i, ":", v, "\n")
---end
+for [1,2,3] function(i, v)
+	print(i, ":", v)
+end
+
+function(map)
+	map.iterate = function(self)
+		i = 0
+		keys = self:keys()
+		return do
+			if i < keys:len() then
+				key = keys:get(i++)
+				return key, self:get(key)
+			end
+		end
+	end
+end(getprototype({}))
+
+for { tom = 1, dick = 2, harry = 43 } function(k, v)
+	print(k, "=>", v)
+end
+
+a = 1
+print(a++)
+print(a++)
+print(a++)
+
+for 10 do(i)
+	if i == 5 then
+		break
+	end
+	print(i)
+end
+
