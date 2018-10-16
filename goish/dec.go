@@ -16,7 +16,7 @@ func NewNodeLitDec(value float64) *NodeLitDec {
 }
 
 func (ld *NodeLitDec) Format() string {
-	return fmt.Sprintf("Dec{%s}", strconv.FormatFloat(ld.value, 'f', -1, 64))
+	return fmt.Sprintf("Dec(%s)", strconv.FormatFloat(ld.value, 'f', -1, 64))
 }
 
 func (ld *NodeLitDec) String() string {

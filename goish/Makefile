@@ -1,5 +1,8 @@
 all:
-	go build && cat test2.lua | ./goish | gofmt > test/main.go && cd test && go run main.go
+	go build && cat test2.goi | ./goish | gofmt > test/main.go && cd test && go run main.go
+
+fib:
+	cat fib.goi | ./goish | gofmt > test/main.go
 
 benchmark-build:
 	go build bench.go

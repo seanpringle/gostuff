@@ -15,7 +15,7 @@ func NewNodeLitInt(value int64) *NodeLitInt {
 }
 
 func (li *NodeLitInt) Format() string {
-	return fmt.Sprintf("Int{%d}", li.value)
+	return fmt.Sprintf("Int(%d)", li.value)
 }
 
 func (li *NodeLitInt) String() string {

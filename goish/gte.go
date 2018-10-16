@@ -29,7 +29,7 @@ func (no *NodeGte) Precedence() int {
 }
 
 func (no *NodeGte) Format() string {
-	return fmt.Sprintf("Bool{gte(one(%s),one(%s))}", no.args[1].Format(), no.args[0].Format())
+	return fmt.Sprintf("Bool(gte(one(%s),one(%s)))", no.args[1].Format(), no.args[0].Format())
 }
 
 func (no *NodeGte) String() string {

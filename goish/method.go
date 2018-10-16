@@ -30,7 +30,7 @@ func (no *NodeMethod) Precedence() int {
 
 func (no *NodeMethod) Format() string {
 	if ex, is := no.args[1].(*NodeExec); is {
-		return fmt.Sprintf("method(get(%s.(Tup), 0),%s)", ex.Format(), no.args[0].(Keyer).FormatKey())
+		return fmt.Sprintf("method(one(%s),%s)", ex.Format(), no.args[0].(Keyer).FormatKey())
 	}
 	return fmt.Sprintf("method(%s,%s)", no.args[1].Format(), no.args[0].(Keyer).FormatKey())
 }

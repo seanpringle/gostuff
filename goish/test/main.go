@@ -6,6 +6,9 @@ import "strings"
 import "strconv"
 import "sync"
 import "time"
+import "log"
+import "os"
+import "runtime/pprof"
 
 type Any interface {
 	Type() string
@@ -53,9 +56,9 @@ func (t Tup) String() string {
 
 func (t Tup) Bool() Bool {
 	if len(t) > 0 {
-		return Bool{truth(t[0])}
+		return Bool(truth(t[0]))
 	}
-	return Bool{false}
+	return Bool(false)
 }
 
 type BoolIsh interface {
@@ -78,12 +81,10 @@ type LenIsh interface {
 	Len() int64
 }
 
-type Bool struct {
-	b bool
-}
+type Bool bool
 
 func (b Bool) String() string {
-	if b.b {
+	if bool(b) {
 		return "true"
 	}
 	return "false"
@@ -126,15 +127,13 @@ func (s Str) Lib() *Map {
 }
 
 func (s Str) Bool() Bool {
-	return Bool{len(s.s) > 0}
+	return Bool(len(s.s) > 0)
 }
 
-type Int struct {
-	i64 int64
-}
+type Int int64
 
 func (i Int) String() string {
-	return fmt.Sprintf("%d", i.i64)
+	return fmt.Sprintf("%d", int64(i))
 }
 
 func (i Int) Int() Int {
@@ -150,23 +149,21 @@ func (i Int) Lib() *Map {
 }
 
 func (i Int) Bool() Bool {
-	return Bool{i.i64 != 0}
+	return Bool(int64(i) != 0)
 }
 
 func (i Int) Dec() Dec {
-	return Dec{float64(i.i64)}
+	return Dec(float64(int64(i)))
 }
 
-type Dec struct {
-	f64 float64
-}
+type Dec float64
 
 func (d Dec) String() string {
-	return strconv.FormatFloat(float64(d.f64), 'f', -1, 64)
+	return strconv.FormatFloat(float64(d), 'f', -1, 64)
 }
 
 func (i Dec) Bool() Bool {
-	return Bool{i.f64 < 0 || i.f64 > 0}
+	return Bool(float64(i) < 0 || float64(i) > 0)
 }
 
 func (d Dec) Dec() Dec {
@@ -184,7 +181,7 @@ func (d Dec) Lib() *Map {
 type Rune rune
 
 func (r Rune) Bool() Bool {
-	return Bool{rune(r) != rune(0)}
+	return Bool(rune(r) != rune(0))
 }
 
 func (r Rune) Type() string {
@@ -203,7 +200,7 @@ type Time time.Time
 
 func (t Time) Bool() Bool {
 	var z time.Time
-	return Bool{time.Time(t) != z}
+	return Bool(time.Time(t) != z)
 }
 
 func (t Time) Type() string {
@@ -229,7 +226,7 @@ func NewTicker(d time.Duration) Ticker {
 }
 
 func (t Ticker) Bool() Bool {
-	return Bool{t.Ticker != nil}
+	return Bool(t.Ticker != nil)
 }
 
 func (t Ticker) Type() string {
@@ -386,7 +383,7 @@ func (s *List) String() string {
 
 func (l *List) Set(pos Any, val Any) {
 	if l != nil {
-		n := pos.(IntIsh).Int().i64
+		n := int64(pos.(IntIsh).Int())
 		if int64(len(l.data)) > n {
 			l.data[n] = val
 		}
@@ -395,7 +392,7 @@ func (l *List) Set(pos Any, val Any) {
 
 func (l *List) Get(pos Any) Any {
 	if l != nil {
-		n := pos.(IntIsh).Int().i64
+		n := int64(pos.(IntIsh).Int())
 		if int64(len(l.data)) > n {
 			return l.data[n]
 		}
@@ -406,7 +403,7 @@ func (l *List) Get(pos Any) Any {
 type Func func(Tup) Tup
 
 func (f Func) Bool() Bool {
-	return Bool{true}
+	return Bool(true)
 }
 
 func (f Func) String() string {
@@ -476,14 +473,19 @@ func (g *Group) Wait() {
 }
 
 func add(a, b Any) Any {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return Int(ai + bi)
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return Int{ai.Int().i64 + bi.Int().i64}
+			return Int(ai.Int() + bi.Int())
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return Dec{ad.Dec().f64 + bd.Dec().f64}
+			return Dec(float64(ad.Dec()) + float64(bd.Dec()))
 		}
 	}
 	if as, is := a.(StrIsh); is {
@@ -493,65 +495,90 @@ func add(a, b Any) Any {
 }
 
 func sub(a, b Any) Any {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return Int(ai - bi)
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return Int{ai.Int().i64 - bi.Int().i64}
+			return Int(ai.Int() - bi.Int())
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return Dec{ad.Dec().f64 - bd.Dec().f64}
+			return Dec(float64(ad.Dec()) - float64(bd.Dec()))
 		}
 	}
 	panic(fmt.Errorf("invalid subtraction: %v %v", a, b))
 }
 
 func mul(a, b Any) Any {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return Int(ai * bi)
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return Int{ai.Int().i64 * bi.Int().i64}
+			return Int(int64(ai.Int()) * int64(bi.Int()))
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return Dec{ad.Dec().f64 * bd.Dec().f64}
+			return Dec(float64(ad.Dec()) * float64(bd.Dec()))
 		}
 	}
 	panic(fmt.Errorf("invalid multiplication: %v %v", a, b))
 }
 
 func div(a, b Any) Any {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return Int(ai / bi)
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return Int{ai.Int().i64 / bi.Int().i64}
+			return Int(int64(ai.Int()) / int64(bi.Int()))
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return Dec{ad.Dec().f64 / bd.Dec().f64}
+			return Dec(float64(ad.Dec()) / float64(bd.Dec()))
 		}
 	}
 	panic(fmt.Errorf("invalid division: %v %v", a, b))
 }
 
 func mod(a, b Any) Any {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return Int(ai % bi)
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return Int{ai.Int().i64 % bi.Int().i64}
+			return Int(int64(ai.Int()) % int64(bi.Int()))
 		}
 	}
 	panic(fmt.Errorf("invalid modulus: %v %v", a, b))
 }
 
 func eq(a, b Any) bool {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return ai == bi
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return ai.Int().i64 == bi.Int().i64
+			return int64(ai.Int()) == int64(bi.Int())
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return math.Abs(ad.Dec().f64-bd.Dec().f64) < 0.000001
+			return math.Abs(float64(ad.Dec())-float64(bd.Dec())) < 0.000001
 		}
 	}
 	return func() (rs bool) {
@@ -564,14 +591,19 @@ func eq(a, b Any) bool {
 }
 
 func lt(a, b Any) bool {
+	if ai, is := a.(Int); is {
+		if bi, is := b.(Int); is {
+			return ai < bi
+		}
+	}
 	if ai, is := a.(IntIsh); is {
 		if bi, is := b.(IntIsh); is {
-			return ai.Int().i64 < bi.Int().i64
+			return int64(ai.Int()) < int64(bi.Int())
 		}
 	}
 	if ad, is := a.(DecIsh); is {
 		if bd, is := b.(DecIsh); is {
-			return ad.Dec().f64 < bd.Dec().f64
+			return float64(ad.Dec()) < float64(bd.Dec())
 		}
 	}
 	if as, is := a.(Str); is {
@@ -596,17 +628,27 @@ func gte(a, b Any) bool {
 
 func truth(a interface{}) bool {
 	if a != nil {
+		if b, is := a.(Bool); is {
+			return bool(b)
+		}
 		if b, is := a.(bool); is {
 			return b
 		}
 		if ab, is := a.(BoolIsh); is {
-			return ab.Bool().b
+			return bool(ab.Bool())
 		}
 	}
 	return false
 }
 
 func join(aa ...Any) Tup {
+	if len(aa) == 1 {
+		if t, is := aa[0].(Tup); is {
+			return t
+		} else {
+			return aa
+		}
+	}
 	var rr Tup
 	for _, a := range aa {
 		if t, is := a.(Tup); is {
@@ -620,7 +662,10 @@ func join(aa ...Any) Tup {
 
 func one(a Any) Any {
 	if t, is := a.(Tup); is {
-		return get(t, 0)
+		if len(t) > 0 {
+			return t[0]
+		}
+		return nil
 	}
 	return a
 }
@@ -632,11 +677,8 @@ func get(aa Tup, i int) Any {
 	return nil
 }
 
-func call(f Any, aa Tup) (rs Any) {
-	if fn, is := f.(Func); is {
-		return fn(aa)
-	}
-	panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
+func call(f Any, aa Tup) Tup {
+	return f.(Func)(aa)
 }
 
 func find(t Any, key Any) Any {
@@ -684,7 +726,7 @@ func loop(fn func()) {
 func trymethod(t Any, k string, def Any) Any {
 	t, m := method(t, Str{k})
 	if m != nil {
-		return call(m, join(t)).(Tup)[0]
+		return get(call(m, join(t)), 0)
 	}
 	return def
 }
@@ -693,8 +735,7 @@ func tostring(s Any) string {
 	return trymethod(s, "string", Str{"nil"}).(Str).s
 }
 
-func noop(a Any) Any {
-	return a
+func noop(a Any) {
 }
 
 var Nprint Any = Func(func(aa Tup) Tup {
@@ -707,7 +748,7 @@ var Nprint Any = Func(func(aa Tup) Tup {
 })
 
 var Nchan Any = Func(func(t Tup) Tup {
-	n := get(t, 0).(IntIsh).Int().i64
+	n := int64(get(t, 0).(IntIsh).Int())
 	c := make(chan Any, int(n))
 	return Tup{Chan(c)}
 })
@@ -741,7 +782,7 @@ func init() {
 	libDef = NewMap(MapData{
 		Str{"len"}: Func(func(t Tup) Tup {
 			s := get(t, 0).(LenIsh)
-			return Tup{Int{s.Len()}}
+			return Tup{Int(s.Len())}
 		}),
 		Str{"type"}: Ntype,
 		Str{"string"}: Func(func(t Tup) Tup {
@@ -809,7 +850,7 @@ func init() {
 			c := get(t, 0).(Chan)
 			a := get(t, 1)
 			c <- a
-			return Tup{Bool{true}}
+			return Tup{Bool(true)}
 		}),
 		Str{"close"}: Func(func(t Tup) Tup {
 			c := get(t, 0).(Chan)
@@ -823,12 +864,12 @@ func init() {
 			g := get(t, 0).(*Group)
 			f := get(t, 1).(Func)
 			g.Run(f, t[2:])
-			return Tup{Bool{true}}
+			return Tup{Bool(true)}
 		}),
 		Str{"wait"}: Func(func(t Tup) Tup {
 			g := get(t, 0).(*Group)
 			g.Wait()
-			return Tup{Bool{true}}
+			return Tup{Bool(true)}
 		}),
 	})
 	libGroup.meta = libDef
@@ -852,9 +893,9 @@ func init() {
 	})
 	libTick.meta = libDef
 	libTime = NewMap(MapData{
-		Str{"ms"}: Int{int64(time.Millisecond)},
+		Str{"ms"}: Int(int64(time.Millisecond)),
 		Str{"ticker"}: Func(func(t Tup) Tup {
-			d := get(t, 0).(Int).i64
+			d := int64(get(t, 0).(Int))
 			return Tup{NewTicker(time.Duration(d))}
 		}),
 	})
@@ -863,380 +904,35 @@ func init() {
 }
 
 func main() {
+
+	f, err := os.Create("cpuprofile")
+	if err != nil {
+		log.Fatal("could not create CPU profile: ", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		log.Fatal("could not start CPU profile: ", err)
+	}
+	defer pprof.StopCPUProfile()
+
 	{
-		var Nhi Any
-		var Ng Any
-		var Nnil Any
-		var Na Any
-		var Ninc Any
-		var Nlen Any
-		var Nc Any
-		var Ntrue Any
-		var Nfalse Any
-		var Nb Any
-		var Nt Any
-		var Ns Any
-		var Nl Any
-		call(Nprint, join(func() Tup {
-			aa := join(call(Nprint, join(Int{1}, Str{"hi"})))
-			Na = get(aa, 0)
-			Nb = get(aa, 1)
-			return aa
-		}()))
-		call(Nprint, join(func() Any {
-			var a Any
-			a = func() Any {
-				var a Any
-				a = Int{1}
-				if truth(a) {
-					var b Any
-					b = Int{0}
-					if truth(b) {
-						return b
-					}
-				}
-				return nil
-			}()
-			if !truth(a) {
-				a = Int{3}
-			}
-			return a
-		}()))
-		call(Nprint, join(add(one(Int{5}), one(Int{6}))))
+		var Nfib Any
 		func() Tup {
 			aa := join(Func(func(aa Tup) Tup {
-				Na := get(aa, 0)
-				noop(Na)
+				Nn := get(aa, 0)
+				noop(Nn)
 				{
-					return join(add(one(Na), one(Int{1})))
+					if truth(Bool(lt(one(Nn), one(Int(2))))) {
+						{
+							return join(Int(1))
+						}
+					}
+					return join(add(one(call(Nfib, join(sub(Nn, Int(2))))), one(call(Nfib, join(sub(Nn, Int(1)))))))
 				}
 				return nil
 			}))
-			Ninc = get(aa, 0)
+			Nfib = get(aa, 0)
 			return aa
 		}()
-		call(Nprint, join(call(Ninc, join(Int{42}))))
-		call(Nprint, join(func() Any {
-			var a Any
-			a = func() Any {
-				var a Any
-				a = Bool{eq(one(Na), one(Int{1}))}
-				if truth(a) {
-					var b Any
-					b = Int{7}
-					if truth(b) {
-						return b
-					}
-				}
-				return nil
-			}()
-			if !truth(a) {
-				a = Int{9}
-			}
-			return a
-		}()))
-		func() Tup {
-			aa := join(NewMap(MapData{Str{"a"}: Int{1}, Str{"__*&^"}: Int{2}, Str{"c"}: NewMap(MapData{Str{"d"}: Func(func(aa Tup) Tup {
-				{
-					return join(Str{"hello world"})
-				}
-				return nil
-			})})}))
-			Nt = get(aa, 0)
-			return aa
-		}()
-		call(Nprint, join(call(find(find(Nt, Str{"c"}), Str{"d"}), join())))
-		func() Tup { aa := join(Int{42}); store(Nt, Str{"a"}, get(aa, 0)); return aa }()
-		call(Nprint, join(Nt))
-		call(Nprint, join(Str{""}, func() Any { t, m := method(Nt, Str{"keys"}); return call(m, join(t)) }()))
-		call(Nprint, join(add(one(mul(one(Int{2}), one(Int{2}))), one(Int{3}))))
-		func() Tup {
-			aa := join(NewMap(MapData{Str{"g"}: Func(func(aa Tup) Tup {
-				{
-					return join(Str{"hello world"})
-				}
-				return nil
-			})}))
-			Nt = get(aa, 0)
-			return aa
-		}()
-		func() Tup {
-			aa := join(Func(func(aa Tup) Tup {
-				Nself := get(aa, 0)
-				noop(Nself)
-				{
-					return join(func() Any { t, m := method(Nself, Str{"g"}); return call(m, join(t)) }())
-				}
-				return nil
-			}))
-			store(Nt, Str{"m"}, get(aa, 0))
-			return aa
-		}()
-		call(Nprint, join(func() Any { t, m := method(Nt, Str{"m"}); return call(m, join(t)) }()))
-		func() Tup { aa := join(Str{"goodbye world"}); Ns = get(aa, 0); return aa }()
-		call(Nprint, join(func() Any { t, m := method(Ns, Str{"len"}); return call(m, join(t)) }()))
-		call(Nprint, join(call(Ntype, join(Ns))))
-		call(Nprint, join(NewList([]Any{Int{1}, Int{2}, Int{7}})))
-		func() Tup { aa := join(NewMap(MapData{})); Na = get(aa, 0); return aa }()
-		call(Nprint, join(Na))
-		func() Any { t, m := method(Na, Str{"set"}); return call(m, join(t, Str{"1"}, Int{1})) }()
-		call(Nprint, join(Na))
-		func() Tup { aa := join(NewMap(MapData{})); Nb = get(aa, 0); return aa }()
-		func() Any { t, m := method(Na, Str{"set"}); return call(m, join(t, Nb, Int{2})) }()
-		call(Nprint, join(Na))
-		func() Any { t, m := method(Nb, Str{"set"}); return call(m, join(t, Str{"2"}, Int{2})) }()
-		call(Nprint, join(Na))
-		func() Tup { aa := join(NewList([]Any{Int{1}, Int{2}, Int{3}})); Nl = get(aa, 0); return aa }()
-		call(Nprint, join(Nl))
-		func() Any { t, m := method(Nl, Str{"push"}); return call(m, join(t, Int{4})) }()
-		call(Nprint, join(Nl))
-		call(Nprint, join(func() Any { t, m := method(Nl, Str{"pop"}); return call(m, join(t)) }()))
-		call(Nprint, join(Nl))
-		call(Nprint, join(add(one(Str{"a"}), one(Str{"b"}))))
-		func() Tup { aa := join(Str{"hi"}); Nlen = get(aa, 0); return aa }()
-		call(Nprint, join(Str{"yo"}, func() Any { t, m := method(Nl, Str{"len"}); return call(m, join(t)) }()))
-		call(Nprint, join(func() Any { t, m := method(Str{"a,b,c"}, Str{"split"}); return call(m, join(t, Str{","})) }()))
-		call(Nprint, join(func() Any {
-			t, m := method(get(func() Any { t, m := method(Str{"a,b,c"}, Str{"split"}); return call(m, join(t, Str{","})) }().(Tup), 0), Str{"join"})
-			return call(m, join(t, Str{":"}))
-		}()))
-		func() Tup { aa := join(call(Nchan, join(Int{10}))); Nc = get(aa, 0); return aa }()
-		func() Any { t, m := method(Nc, Str{"write"}); return call(m, join(t, Int{1})) }()
-		func() Any { t, m := method(Nc, Str{"write"}); return call(m, join(t, Int{2})) }()
-		func() Any { t, m := method(Nc, Str{"write"}); return call(m, join(t, Int{3})) }()
-		call(Nprint, join(func() Any { t, m := method(Nc, Str{"read"}); return call(m, join(t)) }()))
-		call(Nprint, join(func() Any { t, m := method(Nc, Str{"read"}); return call(m, join(t)) }()))
-		call(Nprint, join(func() Any { t, m := method(Nc, Str{"read"}); return call(m, join(t)) }()))
-		func() Tup {
-			aa := join(Func(func(aa Tup) Tup {
-				Ng := get(aa, 0)
-				noop(Ng)
-				{
-					call(Nprint, join(Str{"hi"}))
-				}
-				return nil
-			}))
-			Nhi = get(aa, 0)
-			return aa
-		}()
-		func() Tup { aa := join(call(Ngroup, join())); Ng = get(aa, 0); return aa }()
-		func() Any { t, m := method(Ng, Str{"run"}); return call(m, join(t, Nhi)) }()
-		func() Any { t, m := method(Ng, Str{"run"}); return call(m, join(t, Nhi)) }()
-		func() Any { t, m := method(Ng, Str{"run"}); return call(m, join(t, Nhi)) }()
-		func() Any { t, m := method(Ng, Str{"wait"}); return call(m, join(t)) }()
-		call(Nprint, join(Str{"done"}))
-		call(Nprint, join(func() Any { t, m := method(Nb, Str{"get"}); return call(m, join(t, Str{"hi"})) }()))
-		call(Nprint, join(func() Any {
-			var a Any
-			a = func() Any {
-				var a Any
-				a = Ntrue
-				if truth(a) {
-					var b Any
-					b = Str{"yes"}
-					if truth(b) {
-						return b
-					}
-				}
-				return nil
-			}()
-			if !truth(a) {
-				a = Str{"no"}
-			}
-			return a
-		}()))
-		func() Tup { aa := join(Bool{lt(one(Int{0}), one(Int{1}))}); Ntrue = get(aa, 0); return aa }()
-		func() Tup { aa := join(Bool{lt(one(Int{1}), one(Int{0}))}); Nfalse = get(aa, 0); return aa }()
-		func() Tup {
-			aa := join(func() Any { t, m := method(NewList([]Any{}), Str{"pop"}); return call(m, join(t)) }())
-			Nnil = get(aa, 0)
-			return aa
-		}()
-		call(Func(func(aa Tup) Tup {
-			Nproto := get(aa, 0)
-			noop(Nproto)
-			{
-				func() Tup {
-					aa := join(Func(func(aa Tup) Tup {
-						Nself := get(aa, 0)
-						noop(Nself)
-						{
-							var Ni Any
-							func() Tup { aa := join(Int{0}); Ni = get(aa, 0); return aa }()
-							return join(Func(func(aa Tup) Tup {
-								{
-									if truth(Bool{lt(one(Ni), one(Nself))}) {
-										{
-											return join(func() Any { v := one(Ni); Ni = add(v, Int{1}); return v }())
-										}
-									}
-								}
-								return nil
-							}))
-						}
-						return nil
-					}))
-					store(Nproto, Str{"iterate"}, get(aa, 0))
-					return aa
-				}()
-			}
-			return nil
-		}), join(call(Ngetprototype, join(Int{0}))))
-		loop(func() {
-			it := iterate(Int{10})
-			for {
-				t := it(nil)
-				if get(t, 0) == nil {
-					break
-				}
-				call(Func(func(aa Tup) Tup {
-					Ni := get(aa, 0)
-					noop(Ni)
-					{
-						call(Nprint, join(Ni))
-					}
-					return nil
-				}), t)
-			}
-		})
-		call(Func(func(aa Tup) Tup {
-			Nlist := get(aa, 0)
-			noop(Nlist)
-			{
-				func() Tup {
-					aa := join(Func(func(aa Tup) Tup {
-						Nself := get(aa, 0)
-						noop(Nself)
-						{
-							var Ni Any
-							func() Tup { aa := join(Int{0}); Ni = get(aa, 0); return aa }()
-							return join(Func(func(aa Tup) Tup {
-								{
-									if truth(Bool{lt(one(Ni), one(func() Any { t, m := method(Nself, Str{"len"}); return call(m, join(t)) }()))}) {
-										{
-											return join(func() Any { v := one(Ni); Ni = add(v, Int{1}); return v }(), func() Any { t, m := method(Nself, Str{"get"}); return call(m, join(t, sub(Ni, Int{1}))) }())
-										}
-									}
-								}
-								return nil
-							}))
-						}
-						return nil
-					}))
-					store(Nlist, Str{"iterate"}, get(aa, 0))
-					return aa
-				}()
-			}
-			return nil
-		}), join(call(Ngetprototype, join(NewList([]Any{})))))
-		loop(func() {
-			it := iterate(NewList([]Any{Int{1}, Int{2}, Int{3}}))
-			for {
-				t := it(nil)
-				if get(t, 0) == nil {
-					break
-				}
-				call(Func(func(aa Tup) Tup {
-					Ni := get(aa, 0)
-					noop(Ni)
-					Nv := get(aa, 1)
-					noop(Nv)
-					{
-						call(Nprint, join(Ni, Str{":"}, Nv))
-					}
-					return nil
-				}), t)
-			}
-		})
-		call(Func(func(aa Tup) Tup {
-			Nmap := get(aa, 0)
-			noop(Nmap)
-			{
-				func() Tup {
-					aa := join(Func(func(aa Tup) Tup {
-						Nself := get(aa, 0)
-						noop(Nself)
-						{
-							var Ni Any
-							var Nkeys Any
-							var Nkey Any
-							func() Tup { aa := join(Int{0}); Ni = get(aa, 0); return aa }()
-							func() Tup {
-								aa := join(func() Any { t, m := method(Nself, Str{"keys"}); return call(m, join(t)) }())
-								Nkeys = get(aa, 0)
-								return aa
-							}()
-							return join(Func(func(aa Tup) Tup {
-								{
-									if truth(Bool{lt(one(Ni), one(func() Any { t, m := method(Nkeys, Str{"len"}); return call(m, join(t)) }()))}) {
-										{
-											func() Tup {
-												aa := join(func() Any {
-													t, m := method(Nkeys, Str{"get"})
-													return call(m, join(t, func() Any { v := one(Ni); Ni = add(v, Int{1}); return v }()))
-												}())
-												Nkey = get(aa, 0)
-												return aa
-											}()
-											return join(Nkey, func() Any { t, m := method(Nself, Str{"get"}); return call(m, join(t, Nkey)) }())
-										}
-									}
-								}
-								return nil
-							}))
-						}
-						return nil
-					}))
-					store(Nmap, Str{"iterate"}, get(aa, 0))
-					return aa
-				}()
-			}
-			return nil
-		}), join(call(Ngetprototype, join(NewMap(MapData{})))))
-		loop(func() {
-			it := iterate(NewMap(MapData{Str{"harry"}: Int{43}, Str{"tom"}: Int{1}, Str{"dick"}: Int{2}}))
-			for {
-				t := it(nil)
-				if get(t, 0) == nil {
-					break
-				}
-				call(Func(func(aa Tup) Tup {
-					Nk := get(aa, 0)
-					noop(Nk)
-					Nv := get(aa, 1)
-					noop(Nv)
-					{
-						call(Nprint, join(Nk, Str{"=>"}, Nv))
-					}
-					return nil
-				}), t)
-			}
-		})
-		func() Tup { aa := join(Int{1}); Na = get(aa, 0); return aa }()
-		call(Nprint, join(func() Any { v := one(Na); Na = add(v, Int{1}); return v }()))
-		call(Nprint, join(func() Any { v := one(Na); Na = add(v, Int{1}); return v }()))
-		call(Nprint, join(func() Any { v := one(Na); Na = add(v, Int{1}); return v }()))
-		loop(func() {
-			it := iterate(Int{10})
-			for {
-				t := it(nil)
-				if get(t, 0) == nil {
-					break
-				}
-				call(Func(func(aa Tup) Tup {
-					Ni := get(aa, 0)
-					noop(Ni)
-					{
-						if truth(Bool{eq(one(Ni), one(Int{5}))}) {
-							{
-								loopbreak()
-							}
-						}
-						call(Nprint, join(Ni))
-					}
-					return nil
-				}), t)
-			}
-		})
+		call(Nprint, join(call(Nfib, join(Int(32)))))
 	}
 }

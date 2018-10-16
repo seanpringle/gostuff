@@ -719,6 +719,9 @@ func (p *Parser) run() (wtf error) {
 	p.println(`import "strconv"`)
 	p.println(`import "sync"`)
 	p.println(`import "time"`)
+	p.println(`import "log"`)
+	p.println(`import "os"`)
+	p.println(`import "runtime/pprof"`)
 
 	p.println(`type Any interface{
 		Type() string
@@ -768,9 +771,9 @@ func (p *Parser) run() (wtf error) {
 
 		func (t Tup) Bool() Bool {
 			if len(t) > 0 {
-				return Bool{truth(t[0])}
+				return Bool(truth(t[0]))
 			}
-			return Bool{false}
+			return Bool(false)
 		}
 
 		type BoolIsh interface {
@@ -793,12 +796,10 @@ func (p *Parser) run() (wtf error) {
 			Len() int64
 		}
 
-		type Bool struct {
-			b bool
-		}
+		type Bool bool
 
 		func (b Bool) String() string {
-			if b.b {
+			if bool(b) {
 				return "true"
 			}
 			return "false"
@@ -841,15 +842,13 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (s Str) Bool() Bool {
-			return Bool{len(s.s) > 0}
+			return Bool(len(s.s) > 0)
 		}
 
-		type Int struct {
-			i64 int64
-		}
+		type Int int64
 
 		func (i Int) String() string {
-			return fmt.Sprintf("%d", i.i64)
+			return fmt.Sprintf("%d", int64(i))
 		}
 
 		func (i Int) Int() Int {
@@ -865,23 +864,21 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (i Int) Bool() Bool {
-			return Bool{i.i64 != 0}
+			return Bool(int64(i) != 0)
 		}
 
 		func (i Int) Dec() Dec {
-			return Dec{float64(i.i64)}
+			return Dec(float64(int64(i)))
 		}
 
-		type Dec struct {
-			f64 float64
-		}
+		type Dec float64
 
 		func (d Dec) String() string {
-			return strconv.FormatFloat(float64(d.f64), 'f', -1, 64)
+			return strconv.FormatFloat(float64(d), 'f', -1, 64)
 		}
 
 		func (i Dec) Bool() Bool {
-			return Bool{i.f64 < 0 || i.f64 > 0}
+			return Bool(float64(i) < 0 || float64(i) > 0)
 		}
 
 		func (d Dec) Dec() Dec {
@@ -899,7 +896,7 @@ func (p *Parser) run() (wtf error) {
 		type Rune rune
 
 		func (r Rune) Bool() Bool {
-			return Bool{rune(r) != rune(0)}
+			return Bool(rune(r) != rune(0))
 		}
 
 		func (r Rune) Type() string {
@@ -918,7 +915,7 @@ func (p *Parser) run() (wtf error) {
 
 		func (t Time) Bool() Bool {
 			var z time.Time
-			return Bool{time.Time(t) != z}
+			return Bool(time.Time(t) != z)
 		}
 
 		func (t Time) Type() string {
@@ -944,7 +941,7 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func (t Ticker) Bool() Bool {
-			return Bool{t.Ticker != nil}
+			return Bool(t.Ticker != nil)
 		}
 
 		func (t Ticker) Type() string {
@@ -1101,7 +1098,7 @@ func (p *Parser) run() (wtf error) {
 
 		func (l *List) Set(pos Any, val Any) {
 			if l != nil {
-				n := pos.(IntIsh).Int().i64
+				n := int64(pos.(IntIsh).Int())
 				if int64(len(l.data)) > n {
 					l.data[n] = val
 				}
@@ -1110,7 +1107,7 @@ func (p *Parser) run() (wtf error) {
 
 		func (l *List) Get(pos Any) Any {
 			if l != nil {
-				n := pos.(IntIsh).Int().i64
+				n := int64(pos.(IntIsh).Int())
 				if int64(len(l.data)) > n {
 					return l.data[n]
 				}
@@ -1121,7 +1118,7 @@ func (p *Parser) run() (wtf error) {
 		type Func func(Tup) Tup
 
 		func (f Func) Bool() Bool {
-			return Bool{true}
+			return Bool(true)
 		}
 
 		func (f Func) String() string {
@@ -1191,14 +1188,19 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func add(a, b Any) Any {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return Int(ai + bi)
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return Int{ai.Int().i64 + bi.Int().i64}
+					return Int(ai.Int() + bi.Int())
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return Dec{ad.Dec().f64 + bd.Dec().f64}
+					return Dec(float64(ad.Dec()) + float64(bd.Dec()))
 				}
 			}
 			if as, is := a.(StrIsh); is {
@@ -1208,65 +1210,90 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func sub(a, b Any) Any {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return Int(ai - bi)
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return Int{ai.Int().i64 - bi.Int().i64}
+					return Int(ai.Int() - bi.Int())
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return Dec{ad.Dec().f64 - bd.Dec().f64}
+					return Dec(float64(ad.Dec()) - float64(bd.Dec()))
 				}
 			}
 			panic(fmt.Errorf("invalid subtraction: %v %v", a, b))
 		}
 
 		func mul(a, b Any) Any {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return Int(ai * bi)
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return Int{ai.Int().i64 * bi.Int().i64}
+					return Int(int64(ai.Int()) * int64(bi.Int()))
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return Dec{ad.Dec().f64 * bd.Dec().f64}
+					return Dec(float64(ad.Dec()) * float64(bd.Dec()))
 				}
 			}
 			panic(fmt.Errorf("invalid multiplication: %v %v", a, b))
 		}
 
 		func div(a, b Any) Any {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return Int(ai / bi)
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return Int{ai.Int().i64 / bi.Int().i64}
+					return Int(int64(ai.Int()) / int64(bi.Int()))
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return Dec{ad.Dec().f64 / bd.Dec().f64}
+					return Dec(float64(ad.Dec()) / float64(bd.Dec()))
 				}
 			}
 			panic(fmt.Errorf("invalid division: %v %v", a, b))
 		}
 
 		func mod(a, b Any) Any {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return Int(ai % bi)
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return Int{ai.Int().i64 % bi.Int().i64}
+					return Int(int64(ai.Int()) % int64(bi.Int()))
 				}
 			}
 			panic(fmt.Errorf("invalid modulus: %v %v", a, b))
 		}
 
 		func eq(a, b Any) bool {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return ai == bi
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return ai.Int().i64 == bi.Int().i64
+					return int64(ai.Int()) == int64(bi.Int())
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return math.Abs(ad.Dec().f64-bd.Dec().f64) < 0.000001
+					return math.Abs(float64(ad.Dec()) - float64(bd.Dec())) < 0.000001
 				}
 			}
 			return func() (rs bool) {
@@ -1279,14 +1306,19 @@ func (p *Parser) run() (wtf error) {
 		}
 
 		func lt(a, b Any) bool {
+			if ai, is := a.(Int); is {
+				if bi, is := b.(Int); is {
+					return ai < bi
+				}
+			}
 			if ai, is := a.(IntIsh); is {
 				if bi, is := b.(IntIsh); is {
-					return ai.Int().i64 < bi.Int().i64
+					return int64(ai.Int()) < int64(bi.Int())
 				}
 			}
 			if ad, is := a.(DecIsh); is {
 				if bd, is := b.(DecIsh); is {
-					return ad.Dec().f64 < bd.Dec().f64
+					return float64(ad.Dec()) < float64(bd.Dec())
 				}
 			}
 			if as, is := a.(Str); is {
@@ -1311,17 +1343,27 @@ func (p *Parser) run() (wtf error) {
 
 		func truth(a interface{}) bool {
 			if a != nil {
+				if b, is := a.(Bool); is {
+					return bool(b)
+				}
 				if b, is := a.(bool); is {
 					return b
 				}
 				if ab, is := a.(BoolIsh); is {
-					return ab.Bool().b
+					return bool(ab.Bool())
 				}
 			}
 			return false
 		}
 
 		func join(aa ...Any) Tup {
+			if len(aa) == 1 {
+				if t, is := aa[0].(Tup); is {
+					return t
+				} else {
+					return aa
+				}
+			}
 			var rr Tup
 			for _, a := range aa {
 				if t, is := a.(Tup); is {
@@ -1335,7 +1377,10 @@ func (p *Parser) run() (wtf error) {
 
 		func one(a Any) Any {
 			if t, is := a.(Tup); is {
-				return get(t, 0)
+				if len(t) > 0 {
+					return t[0]
+				}
+				return nil
 			}
 			return a
 		}
@@ -1347,11 +1392,8 @@ func (p *Parser) run() (wtf error) {
 			return nil
 		}
 
-		func call(f Any, aa Tup) (rs Any) {
-			if fn, is := f.(Func); is {
-				return fn(aa)
-			}
-			panic(fmt.Sprintf("attempt to execute a non-function: %v", f))
+		func call(f Any, aa Tup) Tup {
+			return f.(Func)(aa)
 		}
 
 		func find(t Any, key Any) Any {
@@ -1399,7 +1441,7 @@ func (p *Parser) run() (wtf error) {
 		func trymethod(t Any, k string, def Any) Any {
 			t, m := method(t, Str{k})
 			if m != nil {
-				return call(m, join(t)).(Tup)[0]
+				return get(call(m, join(t)), 0)
 			}
 			return def
 		}
@@ -1408,8 +1450,7 @@ func (p *Parser) run() (wtf error) {
 			return trymethod(s, "string", Str{"nil"}).(Str).s
 		}
 
-		func noop(a Any) Any {
-			return a
+		func noop(a Any) {
 		}
 
 		var Nprint Any = Func(func(aa Tup) Tup {
@@ -1422,7 +1463,7 @@ func (p *Parser) run() (wtf error) {
 		})
 
 		var Nchan Any = Func(func(t Tup) Tup {
-			n := get(t, 0).(IntIsh).Int().i64
+			n := int64(get(t, 0).(IntIsh).Int())
 			c := make(chan Any, int(n))
 			return Tup{Chan(c)}
 		})
@@ -1456,7 +1497,7 @@ func (p *Parser) run() (wtf error) {
 			libDef = NewMap(MapData{
 				Str{"len"}: Func(func(t Tup) Tup {
 					s := get(t, 0).(LenIsh)
-					return Tup{Int{s.Len()}}
+					return Tup{Int(s.Len())}
 				}),
 				Str{"type"}: Ntype,
 				Str{"string"}: Func(func(t Tup) Tup {
@@ -1524,7 +1565,7 @@ func (p *Parser) run() (wtf error) {
 					c := get(t, 0).(Chan)
 					a := get(t, 1)
 					c <-a
-					return Tup{Bool{true}}
+					return Tup{Bool(true)}
 				}),
 				Str{"close"}: Func(func(t Tup) Tup {
 					c := get(t, 0).(Chan)
@@ -1538,12 +1579,12 @@ func (p *Parser) run() (wtf error) {
 					g := get(t, 0).(*Group)
 					f := get(t, 1).(Func)
 					g.Run(f, t[2:])
-					return Tup{Bool{true}}
+					return Tup{Bool(true)}
 				}),
 				Str{"wait"}: Func(func(t Tup) Tup {
 					g := get(t, 0).(*Group)
 					g.Wait()
-					return Tup{Bool{true}}
+					return Tup{Bool(true)}
 				}),
 			})
 			libGroup.meta = libDef
@@ -1567,9 +1608,9 @@ func (p *Parser) run() (wtf error) {
 			})
 			libTick.meta = libDef
 			libTime = NewMap(MapData{
-				Str{"ms"}: Int{int64(time.Millisecond)},
+				Str{"ms"}: Int(int64(time.Millisecond)),
 				Str{"ticker"}: Func(func(t Tup) Tup {
-					d := get(t, 0).(Int).i64
+					d := int64(get(t, 0).(Int))
 					return Tup{NewTicker(time.Duration(d))}
 				}),
 			})
@@ -1580,6 +1621,20 @@ func (p *Parser) run() (wtf error) {
 	`)
 
 	p.println(`func main() {`)
+
+	p.println(`
+
+		f, err := os.Create("cpuprofile")
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+
+	`)
+
 	block := p.block(nil, Scope{}, nil)
 	p.println(block.Format())
 	p.println(`}`)
