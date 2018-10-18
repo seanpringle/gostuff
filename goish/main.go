@@ -62,6 +62,28 @@ type Keyer interface {
 	FormatKey() string
 }
 
+type CanFormatOne interface {
+	FormatOne() string
+}
+
+func FormatOne(n Node) string {
+	if f, is := n.(CanFormatOne); is {
+		return f.FormatOne()
+	}
+	return fmt.Sprintf("one(%s)", n.Format())
+}
+
+type CanFormatJoin interface {
+	FormatJoin() string
+}
+
+func FormatJoin(n Node) string {
+	if f, is := n.(CanFormatJoin); is {
+		return f.FormatJoin()
+	}
+	return fmt.Sprintf("join(%s)", n.Format())
+}
+
 type Nodes []Node
 type Scope map[string]Node
 

@@ -18,6 +18,10 @@ func (nn *NodeName) Format() string {
 	return fmt.Sprintf(`N%s`, nn.name)
 }
 
+func (nn *NodeName) FormatOne() string {
+	return fmt.Sprintf(`N%s`, nn.name)
+}
+
 func (nn *NodeName) String() string {
 	return fmt.Sprintf("NodeName{%s}", nn.name)
 }

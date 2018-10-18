@@ -921,18 +921,18 @@ func main() {
 				Nn := get(aa, 0)
 				noop(Nn)
 				{
-					if truth(Bool(lt(one(Nn), one(Int(2))))) {
+					if truth(Bool(lt(Nn, Int(2)))) {
 						{
-							return join(Int(1))
+							return Tup{Int(1)}
 						}
 					}
-					return join(add(one(call(Nfib, join(sub(Nn, Int(2))))), one(call(Nfib, join(sub(Nn, Int(1)))))))
+					return Tup{add(Nfib.(Func)(Tup{sub(Nn, Int(2))})[0], Nfib.(Func)(Tup{sub(Nn, Int(1))})[0])}
 				}
 				return nil
 			}))
 			Nfib = get(aa, 0)
 			return aa
 		}()
-		call(Nprint, join(call(Nfib, join(Int(32)))))
+		Nprint.(Func)(Tup{Nfib.(Func)(Tup{Int(32)})[0]})
 	}
 }

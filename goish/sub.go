@@ -29,7 +29,15 @@ func (na *NodeSub) Precedence() int {
 }
 
 func (na *NodeSub) Format() string {
-	return fmt.Sprintf("sub(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("sub(%s, %s)", FormatOne(na.args[1]), FormatOne(na.args[0]))
+}
+
+func (na *NodeSub) FormatOne() string {
+	return na.Format()
+}
+
+func (na *NodeSub) FormatJoin() string {
+	return fmt.Sprintf("Tup{%s}", na.Format())
 }
 
 func (na *NodeSub) String() string {

@@ -18,6 +18,10 @@ func (li *NodeLitInt) Format() string {
 	return fmt.Sprintf("Int(%d)", li.value)
 }
 
+func (li *NodeLitInt) FormatOne() string {
+	return fmt.Sprintf("Int(%d)", li.value)
+}
+
 func (li *NodeLitInt) String() string {
 	return fmt.Sprintf("NodeLitInt{%d}", li.value)
 }
