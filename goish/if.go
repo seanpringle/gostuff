@@ -19,11 +19,11 @@ func NewNodeIf(flag, ontrue, onfalse Node) *NodeIf {
 }
 
 func (nf *NodeIf) Format() string {
+	flag := FormatBool(nf.flag)
 	if nf.onfalse != nil {
-		return fmt.Sprintf("if truth(%s) { %s } else { %s }", nf.flag.Format(), nf.ontrue.Format(), nf.onfalse.Format())
-
+		return fmt.Sprintf("if %s { %s } else { %s }", flag, nf.ontrue.Format(), nf.onfalse.Format())
 	}
-	return fmt.Sprintf("if truth(%s) { %s }", nf.flag.Format(), nf.ontrue.Format())
+	return fmt.Sprintf("if %s { %s }", flag, nf.ontrue.Format())
 }
 
 func (nf *NodeIf) String() string {

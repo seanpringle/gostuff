@@ -85,6 +85,17 @@ func FormatJoin(n Node) string {
 	return fmt.Sprintf("join(vm, %s)", n.Format())
 }
 
+type CanFormatBool interface {
+	FormatBool() string
+}
+
+func FormatBool(n Node) string {
+	if f, is := n.(CanFormatBool); is {
+		return f.FormatBool()
+	}
+	return fmt.Sprintf("truth(%s)", n.Format())
+}
+
 type Nodes []Node
 type Scope map[string]Node
 

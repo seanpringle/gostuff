@@ -29,9 +29,6 @@ func (vm *VM) ga(n int) *Args {
 		aa := vm.args[l-1]
 		vm.args = vm.args[:l-1]
 		aa.used = n
-		//for i := 0; i < n; i++ {
-		//	aa.set(i, nil)
-		//}
 		return aa
 	}
 	return &Args{used: n}
@@ -39,10 +36,10 @@ func (vm *VM) ga(n int) *Args {
 
 func (vm *VM) da(a *Args) {
 	if a != nil {
-		for i := 0; i < a.used; i++ {
-			a.cells[i] = nil
-		}
 		if len(vm.args) < 16 {
+			for i := 0; i < a.used; i++ {
+				a.cells[i] = nil
+			}
 			vm.args = append(vm.args, a)
 		}
 	}
@@ -745,7 +742,8 @@ func join(vm *VM, t ...Any) *Args {
 	i := 0
 	for _, v := range t {
 		if aa, is := v.(*Args); is {
-			for j := 0; j < aa.len(); j++ {
+			l := aa.len()
+			for j := 0; j < l; j++ {
 				r.set(i, aa.get(j))
 				i++
 			}
@@ -1019,7 +1017,7 @@ func main() {
 				noop(Nn)
 				vm.da(aa)
 				{
-					if truth(Bool(lt(Nn, Int(2)))) {
+					if lt(Nn, Int(2)) {
 						{
 							return join(vm, Int(1))
 						}
@@ -1031,6 +1029,6 @@ func main() {
 			Nfib = aa.get(0)
 			return aa
 		}()
-		call(vm, Nprint, join(vm, call(vm, Nfib, join(vm, Int(32)))))
+		call(vm, Nprint, join(vm, call(vm, Nfib, join(vm, Int(38)))))
 	}
 }

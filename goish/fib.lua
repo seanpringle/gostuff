@@ -3,5 +3,5 @@ local function fib(n)
   return fib(n-2) + fib(n-1)
 end
 
-local n = 32
+local n = 38
 io.write(string.format("Fib(%d): %d\n", n, fib(n)))

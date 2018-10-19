@@ -29,7 +29,11 @@ func (no *NodeLte) Precedence() int {
 }
 
 func (no *NodeLte) Format() string {
-	return fmt.Sprintf("Bool(lte(one(%s),one(%s)))", no.args[1].Format(), no.args[0].Format())
+	return fmt.Sprintf("Bool(%s)", no.FormatBool())
+}
+
+func (no *NodeLte) FormatBool() string {
+	return fmt.Sprintf("lte(%s, %s)", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
 func (no *NodeLte) String() string {
