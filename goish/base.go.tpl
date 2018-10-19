@@ -21,6 +21,9 @@ type VM struct {
 }
 
 func (vm *VM) ga(n int) *Args {
+	if n > 16 {
+		panic("maximum of 16 arguments per call")
+	}
 	l := len(vm.args)
 	if l > 0 {
 		aa := vm.args[l-1]
@@ -36,14 +39,19 @@ func (vm *VM) ga(n int) *Args {
 
 func (vm *VM) da(a *Args) {
 	if a != nil {
-		vm.args = append(vm.args, a)
+		for i := 0; i < a.used; i++ {
+			a.cells[i] = nil
+		}
+		if len(vm.args) < 16 {
+			vm.args = append(vm.args, a)
+		}
 	}
 }
 
 type Args struct {
 	vm    *VM
 	used  int
-	cells [8]Any
+	cells [16]Any
 }
 
 func (aa *Args) Type() string {
@@ -182,6 +190,44 @@ func (i Int) Bool() Bool {
 
 func (i Int) Dec() Dec {
 	return Dec(float64(int64(i)))
+}
+
+type SInt struct {
+	i Int
+}
+
+func (i *SInt) String() string {
+	return i.i.String()
+}
+
+func (i *SInt) Int() Int {
+	return i.i
+}
+
+func (i *SInt) Type() string {
+	return "int"
+}
+
+func (i *SInt) Lib() *Map {
+	return libDef
+}
+
+func (i *SInt) Bool() Bool {
+	return i.i.Bool()
+}
+
+func (i *SInt) Dec() Dec {
+	return Dec(float64(int64(i.i)))
+}
+
+const IntCache = 4096
+
+var SInts [IntCache]SInt
+
+func init() {
+	for i := 0; i < IntCache; i++ {
+		SInts[i] = SInt{Int(i)}
+	}
 }
 
 type Dec float64
@@ -492,10 +538,27 @@ func (g *Group) Wait() {
 	g.g = sync.WaitGroup{}
 }
 
-func add(a, b Any) Any {
+func isInt(a Any) (n Int, b bool) {
 	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
-			return Int(ai + bi)
+		return ai, true
+	}
+	if ai, is := a.(*SInt); is {
+		return ai.Int(), true
+	}
+	return 0, false
+}
+
+func toInt(n Int) Any {
+	if n < IntCache {
+		return &SInts[n]
+	}
+	return n
+}
+
+func add(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(ai + bi)
 		}
 	}
 	if ai, is := a.(IntIsh); is {
@@ -515,9 +578,9 @@ func add(a, b Any) Any {
 }
 
 func sub(a, b Any) Any {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
-			return Int(ai - bi)
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(ai - bi)
 		}
 	}
 	if ai, is := a.(IntIsh); is {
@@ -534,8 +597,8 @@ func sub(a, b Any) Any {
 }
 
 func mul(a, b Any) Any {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
 			return Int(ai * bi)
 		}
 	}
@@ -553,8 +616,8 @@ func mul(a, b Any) Any {
 }
 
 func div(a, b Any) Any {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
 			return Int(ai / bi)
 		}
 	}
@@ -572,8 +635,8 @@ func div(a, b Any) Any {
 }
 
 func mod(a, b Any) Any {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
 			return Int(ai % bi)
 		}
 	}
@@ -586,8 +649,8 @@ func mod(a, b Any) Any {
 }
 
 func eq(a, b Any) bool {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
 			return ai == bi
 		}
 	}
@@ -611,8 +674,8 @@ func eq(a, b Any) bool {
 }
 
 func lt(a, b Any) bool {
-	if ai, is := a.(Int); is {
-		if bi, is := b.(Int); is {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
 			return ai < bi
 		}
 	}
@@ -661,18 +724,14 @@ func truth(a interface{}) bool {
 	return false
 }
 
-func join1(vm *VM, v Any) *Args {
-	if aa, is := v.(*Args); is {
-		return aa
-	}
-	r := vm.ga(1)
-	r.set(0, v)
-	return r
-}
-
 func join(vm *VM, t ...Any) *Args {
 	if len(t) == 1 {
-		return join1(vm, t[0])
+		if aa, is := t[0].(*Args); is {
+			return aa
+		}
+		r := vm.ga(1)
+		r.set(0, t[0])
+		return r
 	}
 	l := 0
 	for _, v := range t {
