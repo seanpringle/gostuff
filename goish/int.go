@@ -19,7 +19,7 @@ func (li *NodeLitInt) Format() string {
 }
 
 func (li *NodeLitInt) FormatOne() string {
-	return fmt.Sprintf("Int(%d)", li.value)
+	return li.Format()
 }
 
 func (li *NodeLitInt) String() string {

@@ -35,21 +35,9 @@ func (ne *NodeExec) Format() string {
 		args = NewNodeLitInt(0)
 	}
 	if m, is := ne.name.(*NodeMethod); is {
-		return fmt.Sprintf("func() Tup { t, m := %s; return call(m, join(t, %s)); }()", m.Format(), args.Format())
+		return fmt.Sprintf("func() *Args { t, m := %s; return call(vm, m, join(vm, t, %s)); }()", m.Format(), args.Format())
 	}
-	//if p, is := ne.args.(Producer); is {
-	//	if p.Produces() == 1 {
-	//		return fmt.Sprintf("call(%s, %s)", ne.name.Format(), args)
-	//	}
-	//}
-	if f, is := ne.name.(*NodeName); is {
-		return fmt.Sprintf("%s.(Func)(%s)", f.Format(), FormatJoin(args))
-	}
-	return fmt.Sprintf("call(%s, %s)", ne.name.Format(), FormatJoin(args))
-}
-
-func (ne *NodeExec) FormatOne() string {
-	return fmt.Sprintf("%s[0]", ne.Format())
+	return fmt.Sprintf("call(vm, %s, %s)", ne.name.Format(), FormatJoin(args))
 }
 
 func (ne *NodeExec) String() string {

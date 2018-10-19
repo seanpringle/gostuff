@@ -21,11 +21,11 @@ func (nf *NodeFunc) Format() string {
 
 	init := []string{}
 	for i, arg := range nf.args {
-		init = append(init, fmt.Sprintf("%s := get(aa, %d); noop(%s)", arg.(*NodeName).Format(), i, arg.(*NodeName).Format()))
+		init = append(init, fmt.Sprintf("%s := aa.get(%d); noop(%s)", arg.(*NodeName).Format(), i, arg.(*NodeName).Format()))
 	}
 
 	//return fmt.Sprintf("Func(func(aa Tup) Tup { %s; return func() Tup { %s; return Tup{nil}; }() })",
-	return fmt.Sprintf("Func(func(aa Tup) Tup { %s; %s; return nil })",
+	return fmt.Sprintf("Func(func(vm *VM, aa *Args) *Args { %s; vm.da(aa); %s; return nil })",
 		strings.Join(init, ";"),
 		nf.body.Format(),
 	)

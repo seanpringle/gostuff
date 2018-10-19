@@ -29,7 +29,7 @@ func (na *NodeDiv) Precedence() int {
 }
 
 func (na *NodeDiv) Format() string {
-	return fmt.Sprintf("div(one(%s), one(%s))", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("div(%s, %s)", FormatOne(na.args[1]), FormatOne(na.args[0]))
 }
 
 func (na *NodeDiv) String() string {

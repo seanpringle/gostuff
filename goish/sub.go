@@ -36,10 +36,6 @@ func (na *NodeSub) FormatOne() string {
 	return na.Format()
 }
 
-func (na *NodeSub) FormatJoin() string {
-	return fmt.Sprintf("Tup{%s}", na.Format())
-}
-
 func (na *NodeSub) String() string {
 	return fmt.Sprintf("NodeSub{%s, %s}", na.args[0], na.args[1])
 }

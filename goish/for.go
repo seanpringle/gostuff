@@ -29,7 +29,7 @@ func NewNodeFor(item, body Node) *NodeFor {
 }
 
 func (nf *NodeFor) Format() string {
-	return fmt.Sprintf("loop(func() { it := iterate(%s); for { t := it(nil); if get(t, 0) == nil { break }; call(%s, t); } })", nf.item.Format(), nf.body.Format())
+	return fmt.Sprintf("loop(func() { it := iterate(%s); for { aa := it(vm, nil); if aa.get(0) == nil { vm.da(aa); break }; call(vm, %s, aa); } })", nf.item.Format(), nf.body.Format())
 }
 
 func (nf *NodeFor) String() string {

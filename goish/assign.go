@@ -26,13 +26,13 @@ func (na *NodeAssign) Format() string {
 	assigns := []string{}
 	for i, src := range na.targets {
 		if find, is := src.(*NodeFind); is {
-			assigns = append(assigns, find.FormatStore(fmt.Sprintf("get(aa, %d)", i)))
+			assigns = append(assigns, find.FormatStore(fmt.Sprintf("aa.get(%d)", i)))
 		} else {
-			assigns = append(assigns, fmt.Sprintf("%s = get(aa, %d)", src.Format(), i))
+			assigns = append(assigns, fmt.Sprintf("%s = aa.get(%d)", src.Format(), i))
 		}
 	}
 
-	return fmt.Sprintf("func() Tup { aa := join(%s); %s; return aa }()",
+	return fmt.Sprintf("func() *Args { aa := join(vm, %s); %s; return aa }()",
 		na.sources.Format(),
 		strings.Join(assigns, ";"),
 	)

@@ -29,7 +29,7 @@ func (no *NodeEq) Precedence() int {
 }
 
 func (no *NodeEq) Format() string {
-	return fmt.Sprintf("Bool(eq(one(%s),one(%s)))", no.args[1].Format(), no.args[0].Format())
+	return fmt.Sprintf("Bool(eq(%s,%s))", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
 func (no *NodeEq) String() string {

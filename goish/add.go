@@ -36,10 +36,6 @@ func (na *NodeAdd) FormatOne() string {
 	return na.Format()
 }
 
-func (na *NodeAdd) FormatJoin() string {
-	return fmt.Sprintf("Tup{%s}", na.Format())
-}
-
 func (na *NodeAdd) String() string {
 	return fmt.Sprintf("NodeAdd{%s, %s}", na.args[0], na.args[1])
 }
