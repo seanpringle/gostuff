@@ -17,38 +17,34 @@ type Any interface {
 }
 
 type VM struct {
-	args []*Args
+	argsC [8]*Args
+	argsN int
 }
 
 func (vm *VM) ga(n int) *Args {
-	if n > 16 {
-		panic("maximum of 16 arguments per call")
+	if n > 32 {
+		panic("maximum of 32 arguments per call")
 	}
-	l := len(vm.args)
-	if l > 0 {
-		aa := vm.args[l-1]
-		vm.args = vm.args[:l-1]
-		aa.used = n
+	if vm.argsN > 0 {
+		vm.argsN--
+		aa := vm.argsC[vm.argsN]
+		aa.used = 0
 		return aa
 	}
-	return &Args{used: n}
+	return &Args{}
 }
 
 func (vm *VM) da(a *Args) {
-	if a != nil {
-		if len(vm.args) < 16 {
-			for i := 0; i < a.used; i++ {
-				a.cells[i] = nil
-			}
-			vm.args = append(vm.args, a)
-		}
+	if a != nil && vm.argsN < 8 {
+		a.used = 0
+		vm.argsC[vm.argsN] = a
+		vm.argsN++
 	}
 }
 
 type Args struct {
-	vm    *VM
-	used  int
-	cells [16]Any
+	used  uint
+	cells [32]Any
 }
 
 func (aa *Args) Type() string {
@@ -64,23 +60,33 @@ func (aa *Args) Lib() *Map {
 }
 
 func (aa *Args) get(i int) Any {
-	if aa != nil && i < aa.used {
+	if i >= 32 {
+		panic("maximum of 32 arguments per call")
+	}
+	if aa != nil && 1<<uint(i)&aa.used != 0 {
 		return aa.cells[i]
 	}
 	return nil
 }
 
 func (aa *Args) set(i int, v Any) {
-	if aa != nil && i < aa.used {
+	if i >= 32 {
+		panic("maximum of 32 arguments per call")
+	}
+	if aa != nil {
 		aa.cells[i] = v
+		aa.used = aa.used | 1<<uint(i)
 	}
 }
 
 func (aa *Args) len() int {
-	if aa != nil {
-		return aa.used
+	l := 0
+	u := aa.used
+	for u != 0 {
+		l++
+		u = u >> 1
 	}
-	return 0
+	return l
 }
 
 var libDef *Map
@@ -305,7 +311,7 @@ func (t Ticker) Type() string {
 }
 
 func (t Ticker) String() string {
-	return fmt.Sprintf("%v", t.Ticker)
+	return "ticker"
 }
 
 func (t Ticker) Lib() *Map {
@@ -314,6 +320,11 @@ func (t Ticker) Lib() *Map {
 
 func (t Ticker) Read() Any {
 	return Time(<-t.Ticker.C)
+}
+
+func (t Ticker) Stop() Any {
+	t.Ticker.Stop()
+	return nil
 }
 
 type MapData map[Any]Any
@@ -871,6 +882,7 @@ func init() {
 	libDef = NewMap(MapData{
 		Str{"len"}: Func(func(vm *VM, aa *Args) *Args {
 			s := aa.get(0).(LenIsh)
+			vm.da(aa)
 			return join(vm, Int(s.Len()))
 		}),
 		Str{"type"}: Ntype,
@@ -884,6 +896,7 @@ func init() {
 			for k, _ := range aa.get(0).(*Map).data {
 				keys = append(keys, k)
 			}
+			vm.da(aa)
 			return join(vm, NewList(keys))
 		}),
 		Str{"set"}: Func(func(vm *VM, aa *Args) *Args {
@@ -899,12 +912,14 @@ func init() {
 		Str{"push"}: Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
+			vm.da(aa)
 			l.data = append(l.data, v)
 			return join(vm, l)
 		}),
 		Str{"pop"}: Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			n := len(l.data) - 1
+			vm.da(aa)
 			var v Any
 			if len(l.data) < n {
 				v = l.data[n]
@@ -915,6 +930,7 @@ func init() {
 		Str{"join"}: Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			j := aa.get(1)
+			vm.da(aa)
 			var ls []string
 			for _, s := range l.data {
 				ls = append(ls, tostring(s))
@@ -933,16 +949,19 @@ func init() {
 	libChan = NewMap(MapData{
 		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(Chan)
+			vm.da(aa)
 			return join(vm, <-c)
 		}),
 		Str{"write"}: Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(Chan)
 			a := aa.get(1)
+			vm.da(aa)
 			c <- a
 			return join(vm, Bool(true))
 		}),
 		Str{"close"}: Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(Chan)
+			vm.da(aa)
 			close(c)
 			return nil
 		}),
@@ -957,10 +976,12 @@ func init() {
 				ab.set(i, aa.get(i+2))
 			}
 			g.Run(f, ab)
+			vm.da(aa)
 			return join(vm, Bool(true))
 		}),
 		Str{"wait"}: Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
+			vm.da(aa)
 			g.Wait()
 			return join(vm, Bool(true))
 		}),
@@ -970,6 +991,7 @@ func init() {
 		Str{"split"}: Func(func(vm *VM, aa *Args) *Args {
 			s := tostring(aa.get(0))
 			j := tostring(aa.get(1))
+			vm.da(aa)
 			l := []Any{}
 			for _, p := range strings.Split(s, j) {
 				l = append(l, Str{p})
@@ -981,7 +1003,13 @@ func init() {
 	libTick = NewMap(MapData{
 		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
+			vm.da(aa)
 			return join(vm, ti.Read())
+		}),
+		Str{"stop"}: Func(func(vm *VM, aa *Args) *Args {
+			ti := aa.get(0).(Ticker)
+			vm.da(aa)
+			return join(vm, ti.Stop())
 		}),
 	})
 	libTick.meta = libDef
@@ -989,6 +1017,7 @@ func init() {
 		Str{"ms"}: Int(int64(time.Millisecond)),
 		Str{"ticker"}: Func(func(vm *VM, aa *Args) *Args {
 			d := int64(aa.get(0).(Int))
+			vm.da(aa)
 			return join(vm, NewTicker(time.Duration(d)))
 		}),
 	})

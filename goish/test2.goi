@@ -1,4 +1,5 @@
 print(a, b = print(1,"hi"))
+
 print(1 and 0 or 3)
 print(5+6)
 
@@ -97,52 +98,13 @@ print(b:get("hi"))
 
 print(true and "yes" or "no")
 
-true = 0 < 1
-false = 1 < 0
-nil = []:pop()
-
-function(proto)
-	proto.iterate = function(self)
-		i = 0
-		return do
-			if i < self then
-				return i++
-			end
-		end
-	end
-end(getprototype(0))
-
 for 10 do(i)
 	print(i)
 end
 
-function(list)
-	list.iterate = function(self)
-		i = 0
-		return do
-			if i < self:len() then
-				return i++, self:get(i-1)
-			end
-		end
-	end
-end(getprototype([]))
-
 for [1,2,3] function(i, v)
 	print(i, ":", v)
 end
-
-function(map)
-	map.iterate = function(self)
-		i = 0
-		keys = self:keys()
-		return do
-			if i < keys:len() then
-				key = keys:get(i++)
-				return key, self:get(key)
-			end
-		end
-	end
-end(getprototype({}))
 
 for { tom = 1, dick = 2, harry = 43 } function(k, v)
 	print(k, "=>", v)

@@ -47,9 +47,25 @@ func (nb *NodeBlock) Format() string {
 	for _, n := range nb.scope {
 		scope = append(scope, n.Format())
 	}
+	statements := []string{}
+	for _, n := range nb.expr {
+		if nt, is := n.(NodeTuple); is {
+			if len(nt) == 1 {
+				if ne, is := nt[0].(*NodeExec); is {
+					statements = append(statements, fmt.Sprintf("vm.da(%s)", ne.Format()))
+					continue
+				}
+			}
+		}
+		if na, is := n.(*NodeAssign); is {
+			statements = append(statements, fmt.Sprintf("vm.da(%s)", na.Format()))
+			continue
+		}
+		statements = append(statements, n.Format())
+	}
 	return fmt.Sprintf("{ %s; %s }",
 		strings.Join(scope, "\n"),
-		nb.expr.FormatJoin("\n"),
+		strings.Join(statements, "\n"),
 	)
 }
 
