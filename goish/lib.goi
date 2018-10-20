@@ -1,0 +1,50 @@
+true = 0 < 1
+false = 1 < 0
+nil = []:pop()
+
+function(proto)
+	proto.iterate = function(self)
+		i = 0
+		return do
+			if i < self then
+				return i++
+			end
+		end
+	end
+end(getprototype(0))
+
+function(list)
+	list.iterate = function(self)
+		i = 0
+		return do
+			if i < self:len() then
+				return i++, self:get(i-1)
+			end
+		end
+	end
+end(getprototype([]))
+
+function(map)
+	map.iterate = function(self)
+		i = 0
+		keys = self:keys()
+		return do
+			if i < keys:len() then
+				key = keys:get(i++)
+				return key, self:get(key)
+			end
+		end
+	end
+end(getprototype({}))
+
+function()
+	ti = time.ticker(1)
+	tick = getprototype(ti)
+	tick.iterate = function(self)
+		i = 0
+		return do
+			return i++, self:read()
+		end
+	end
+	ti:stop()
+end()
