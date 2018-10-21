@@ -858,6 +858,13 @@ func tostring(s Any) string {
 	return trymethod(s, "string", Str{"nil"}).(Str).s
 }
 
+func length(v Any) Any {
+	if l, is := v.(LenIsh); is {
+		return Int(l.Len())
+	}
+	return trymethod(v, "len", nil)
+}
+
 func noop(a Any) {
 }
 
@@ -900,20 +907,18 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 })
 
 var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
-	if m, is := aa.get(0).(*Map); is {
+	v := aa.get(0)
+	if v == nil {
+		return join(vm, libDef)
+	}
+	if m, is := v.(*Map); is {
 		return join(vm, m.meta)
 	}
-	return join(vm, aa.get(0).Lib())
+	return join(vm, v.Lib())
 })
 
 func init() {
 	libDef = NewMap(MapData{
-		Str{"len"}: Func(func(vm *VM, aa *Args) *Args {
-			s := aa.get(0).(LenIsh)
-			vm.da(aa)
-			return join(vm, Int(s.Len()))
-		}),
-		Str{"type"}: Ntype,
 		Str{"string"}: Func(func(vm *VM, aa *Args) *Args {
 			return join(vm, Str{fmt.Sprintf("%v", aa.get(0))})
 		}),
@@ -926,13 +931,6 @@ func init() {
 			}
 			vm.da(aa)
 			return join(vm, NewList(keys))
-		}),
-		Str{"set"}: Func(func(vm *VM, aa *Args) *Args {
-			aa.get(0).(*Map).Set(aa.get(1), aa.get(2))
-			return join(vm, aa.get(0))
-		}),
-		Str{"get"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, aa.get(0).(*Map).Get(aa.get(1)))
 		}),
 	})
 	libMap.meta = libDef
@@ -981,13 +979,6 @@ func init() {
 				ls = append(ls, tostring(s))
 			}
 			return join(vm, Str{strings.Join(ls, tostring(j))})
-		}),
-		Str{"set"}: Func(func(vm *VM, aa *Args) *Args {
-			aa.get(0).(*List).Set(aa.get(1), aa.get(2))
-			return join(vm, aa.get(1), aa.get(2))
-		}),
-		Str{"get"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, aa.get(0).(*List).Get(aa.get(1)))
 		}),
 	})
 	libList.meta = libDef

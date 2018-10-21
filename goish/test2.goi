@@ -154,3 +154,5 @@ m = { a = 1, b = { c = 4 } }
 print(m\"b"\"c")
 m\"b"\"c" = 5
 print(m\"b"\"c")
+
+print("length", #l, #m)

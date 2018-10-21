@@ -359,6 +359,11 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeMod()
 	}
 
+	if p.scan() == '#' {
+		p.take()
+		return NewNodeLen()
+	}
+
 	if p.peek("return") {
 		p.take()
 		p.take()

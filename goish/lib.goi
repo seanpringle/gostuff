@@ -3,6 +3,16 @@ false = 1 < 0
 nil = []:pop()
 
 function()
+	p = getprototype(nil)
+	p.type = function(self)
+		return type(p)
+	end
+	p.len = function(self)
+		return #self
+	end
+end()
+
+function()
 	p = getprototype(0)
 	p.iterate = function(self)
 		i = 0
@@ -24,6 +34,12 @@ function()
 			end
 		end
 	end
+	l.set = function(self, pos, val)
+		self\pos = val
+	end
+	l.get = function(self, pos)
+		return self\pos
+	end
 end()
 
 function()
@@ -37,6 +53,12 @@ function()
 				return key, self:get(key)
 			end
 		end
+	end
+	m.set = function(self, pos, val)
+		self\pos = val
+	end
+	m.get = function(self, pos)
+		return self\pos
 	end
 end()
 

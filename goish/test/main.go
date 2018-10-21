@@ -858,6 +858,13 @@ func tostring(s Any) string {
 	return trymethod(s, "string", Str{"nil"}).(Str).s
 }
 
+func length(v Any) Any {
+	if l, is := v.(LenIsh); is {
+		return Int(l.Len())
+	}
+	return trymethod(v, "len", nil)
+}
+
 func noop(a Any) {
 }
 
@@ -900,20 +907,18 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 })
 
 var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
-	if m, is := aa.get(0).(*Map); is {
+	v := aa.get(0)
+	if v == nil {
+		return join(vm, libDef)
+	}
+	if m, is := v.(*Map); is {
 		return join(vm, m.meta)
 	}
-	return join(vm, aa.get(0).Lib())
+	return join(vm, v.Lib())
 })
 
 func init() {
 	libDef = NewMap(MapData{
-		Str{"len"}: Func(func(vm *VM, aa *Args) *Args {
-			s := aa.get(0).(LenIsh)
-			vm.da(aa)
-			return join(vm, Int(s.Len()))
-		}),
-		Str{"type"}: Ntype,
 		Str{"string"}: Func(func(vm *VM, aa *Args) *Args {
 			return join(vm, Str{fmt.Sprintf("%v", aa.get(0))})
 		}),
@@ -926,13 +931,6 @@ func init() {
 			}
 			vm.da(aa)
 			return join(vm, NewList(keys))
-		}),
-		Str{"set"}: Func(func(vm *VM, aa *Args) *Args {
-			aa.get(0).(*Map).Set(aa.get(1), aa.get(2))
-			return join(vm, aa.get(0))
-		}),
-		Str{"get"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, aa.get(0).(*Map).Get(aa.get(1)))
 		}),
 	})
 	libMap.meta = libDef
@@ -981,13 +979,6 @@ func init() {
 				ls = append(ls, tostring(s))
 			}
 			return join(vm, Str{strings.Join(ls, tostring(j))})
-		}),
-		Str{"set"}: Func(func(vm *VM, aa *Args) *Args {
-			aa.get(0).(*List).Set(aa.get(1), aa.get(2))
-			return join(vm, aa.get(1), aa.get(2))
-		}),
-		Str{"get"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, aa.get(0).(*List).Get(aa.get(1)))
 		}),
 	})
 	libList.meta = libDef
@@ -1084,22 +1075,22 @@ func main() {
 	vm := &VM{}
 
 	{
-		var Nc Any
-		var Nnil Any
-		var Na Any
-		var Nlen Any
 		var Ntrue Any
-		var Nfalse Any
-		var Nt Any
-		var Nblinker Any
-		var Nblink Any
 		var Nb Any
+		var Nlen Any
+		var Nblink Any
+		var Nt Any
+		var Nhi Any
+		var Nblinker Any
+		var Nfalse Any
+		var Nnil Any
 		var Ninc Any
 		var Nl Any
-		var Nm Any
+		var Na Any
 		var Ns Any
-		var Nhi Any
+		var Nc Any
 		var Ng Any
+		var Nm Any
 		func() Any { a := Bool(lt(Int(0), Int(1))); Ntrue = a; return a }()
 		func() Any { a := Bool(lt(Int(1), Int(0))); Nfalse = a; return a }()
 		func() Any {
@@ -1107,6 +1098,40 @@ func main() {
 			Nnil = a
 			return a
 		}()
+		vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
+			vm.da(aa)
+			{
+				var Np Any
+				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Np = a; return a }()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						vm.da(aa)
+						{
+							return join(vm, call(vm, Ntype, join(vm, Np)))
+						}
+						return nil
+					}))
+					store(Np, Str{"type"}, a)
+					return a
+				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						vm.da(aa)
+						{
+							return join(vm, length(Nself))
+						}
+						return nil
+					}))
+					store(Np, Str{"len"}, a)
+					return a
+				}()
+			}
+			return nil
+		}), join(vm, nil)))
 		vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
 			vm.da(aa)
 			{
@@ -1170,6 +1195,38 @@ func main() {
 					store(Nl, Str{"iterate"}, a)
 					return a
 				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						Npos := aa.get(1)
+						noop(Npos)
+						Nval := aa.get(2)
+						noop(Nval)
+						vm.da(aa)
+						{
+							func() Any { a := Nval; store(Nself, Npos, a); return a }()
+						}
+						return nil
+					}))
+					store(Nl, Str{"set"}, a)
+					return a
+				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						Npos := aa.get(1)
+						noop(Npos)
+						vm.da(aa)
+						{
+							return join(vm, field(Nself, Npos))
+						}
+						return nil
+					}))
+					store(Nl, Str{"get"}, a)
+					return a
+				}()
 			}
 			return nil
 		}), join(vm, nil)))
@@ -1184,9 +1241,9 @@ func main() {
 						noop(Nself)
 						vm.da(aa)
 						{
+							var Nkey Any
 							var Ni Any
 							var Nkeys Any
-							var Nkey Any
 							func() Any { a := Int(0); Ni = a; return a }()
 							func() Any {
 								a := one(vm, func() *Args { t, m := method(Nself, Str{"keys"}); return call(vm, m, join(vm, t, nil)) }())
@@ -1216,6 +1273,38 @@ func main() {
 						return nil
 					}))
 					store(Nm, Str{"iterate"}, a)
+					return a
+				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						Npos := aa.get(1)
+						noop(Npos)
+						Nval := aa.get(2)
+						noop(Nval)
+						vm.da(aa)
+						{
+							func() Any { a := Nval; store(Nself, Npos, a); return a }()
+						}
+						return nil
+					}))
+					store(Nm, Str{"set"}, a)
+					return a
+				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nself := aa.get(0)
+						noop(Nself)
+						Npos := aa.get(1)
+						noop(Npos)
+						vm.da(aa)
+						{
+							return join(vm, field(Nself, Npos))
+						}
+						return nil
+					}))
+					store(Nm, Str{"get"}, a)
 					return a
 				}()
 			}
@@ -1607,5 +1696,6 @@ func main() {
 		vm.da(call(vm, Nprint, join(vm, field(field(Nm, Str{"b"}), Str{"c"}))))
 		func() Any { a := Int(5); store(field(Nm, Str{"b"}), Str{"c"}, a); return a }()
 		vm.da(call(vm, Nprint, join(vm, field(field(Nm, Str{"b"}), Str{"c"}))))
+		vm.da(call(vm, Nprint, join(vm, Str{"length"}, length(Nl), length(Nm))))
 	}
 }
