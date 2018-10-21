@@ -8,6 +8,7 @@ import "sync"
 import "time"
 import "log"
 import "os"
+import "sort"
 import "runtime/pprof"
 
 type Any interface {
@@ -56,14 +57,14 @@ func (aa *Args) String() string {
 }
 
 func (aa *Args) Lib() *Map {
-	return libDef
+	return protoDef
 }
 
 func (aa *Args) get(i int) Any {
 	if i >= 32 {
 		panic("maximum of 32 arguments per call")
 	}
-	if aa != nil && 1<<uint(i)&aa.used != 0 {
+	if aa != nil && (1<<uint(i))&aa.used != 0 {
 		return aa.cells[i]
 	}
 	return nil
@@ -75,28 +76,35 @@ func (aa *Args) set(i int, v Any) {
 	}
 	if aa != nil {
 		aa.cells[i] = v
-		aa.used = aa.used | 1<<uint(i)
+		aa.used = aa.used | (1 << uint(i))
 	}
 }
 
 func (aa *Args) len() int {
 	l := 0
-	u := aa.used
-	for u != 0 {
-		l++
-		u = u >> 1
+	if aa != nil {
+		u := aa.used
+		for u != 0 {
+			l++
+			u = u >> 1
+		}
 	}
 	return l
 }
 
-var libDef *Map
-var libMap *Map
-var libList *Map
-var libStr *Map
-var libChan *Map
-var libGroup *Map
+var protoDef *Map
+var protoInt *Map
+var protoDec *Map
+var protoMap *Map
+var protoList *Map
+var protoStr *Map
+var protoChan *Map
+var protoGroup *Map
+var protoInst *Map
+var protoTick *Map
+
 var libTime *Map
-var libTick *Map
+var libSync *Map
 
 type Stringer = fmt.Stringer
 
@@ -138,7 +146,7 @@ func (b Bool) Type() string {
 }
 
 func (b Bool) Lib() *Map {
-	return libDef
+	return protoDef
 }
 
 type Str struct {
@@ -162,7 +170,7 @@ func (s Str) Len() int64 {
 }
 
 func (s Str) Lib() *Map {
-	return libStr
+	return protoStr
 }
 
 func (s Str) Bool() Bool {
@@ -184,7 +192,7 @@ func (i Int) Type() string {
 }
 
 func (i Int) Lib() *Map {
-	return libDef
+	return protoInt
 }
 
 func (i Int) Bool() Bool {
@@ -212,7 +220,7 @@ func (i *SInt) Type() string {
 }
 
 func (i *SInt) Lib() *Map {
-	return libDef
+	return protoInt
 }
 
 func (i *SInt) Bool() Bool {
@@ -252,7 +260,7 @@ func (d Dec) Type() string {
 }
 
 func (d Dec) Lib() *Map {
-	return libDef
+	return protoDec
 }
 
 type Rune rune
@@ -270,26 +278,26 @@ func (r Rune) String() string {
 }
 
 func (r Rune) Lib() *Map {
-	return libDef
+	return protoDef
 }
 
-type Time time.Time
+type Instant time.Time
 
-func (t Time) Bool() Bool {
+func (t Instant) Bool() Bool {
 	var z time.Time
 	return Bool(time.Time(t) != z)
 }
 
-func (t Time) Type() string {
-	return "time"
+func (t Instant) Type() string {
+	return "instant"
 }
 
-func (t Time) String() string {
+func (t Instant) String() string {
 	return fmt.Sprintf("%v", time.Time(t))
 }
 
-func (t Time) Lib() *Map {
-	return libTime
+func (t Instant) Lib() *Map {
+	return protoInst
 }
 
 type Ticker struct {
@@ -315,11 +323,11 @@ func (t Ticker) String() string {
 }
 
 func (t Ticker) Lib() *Map {
-	return libTick
+	return protoTick
 }
 
 func (t Ticker) Read() Any {
-	return Time(<-t.Ticker.C)
+	return Instant(<-t.Ticker.C)
 }
 
 func (t Ticker) Stop() Any {
@@ -337,7 +345,7 @@ type Map struct {
 func NewMap(data MapData) *Map {
 	return &Map{
 		data: data,
-		meta: libMap,
+		meta: protoMap,
 	}
 }
 
@@ -408,7 +416,8 @@ func (t *Map) String() string {
 			if _, is := v.(*List); is {
 				v = Str{"slice"}
 			}
-			pairs = append(pairs, fmt.Sprintf("%v = %v", tostring(k), tostring(v)))
+			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
+			pairs = append(pairs, fmt.Sprintf("%s = %s", k.String(), v.String()))
 		}
 		return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
 	}
@@ -424,7 +433,7 @@ func NewList(data []Any) *List {
 }
 
 func (t *List) Lib() *Map {
-	return libList
+	return protoList
 }
 
 func (s *List) Type() string {
@@ -483,21 +492,29 @@ func (f Func) Type() string {
 }
 
 func (f Func) Lib() *Map {
-	return libDef
+	return protoDef
 }
 
-type Chan chan Any
+type Chan struct {
+	c chan Any
+}
 
-func (c Chan) Type() string {
+func NewChan(n int) *Chan {
+	return &Chan{
+		c: make(chan Any, n),
+	}
+}
+
+func (c *Chan) Type() string {
 	return "channel"
 }
 
-func (c Chan) String() string {
+func (c *Chan) String() string {
 	return "channel"
 }
 
-func (c Chan) Lib() *Map {
-	return libChan
+func (c *Chan) Lib() *Map {
+	return protoChan
 }
 
 type Group struct {
@@ -517,7 +534,7 @@ func (g *Group) String() string {
 }
 
 func (g *Group) Lib() *Map {
-	return libGroup
+	return protoGroup
 }
 
 func (g *Group) Run(f Func, t *Args) {
@@ -877,22 +894,16 @@ var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
 	return aa
 })
 
-var Nchan Any = Func(func(vm *VM, aa *Args) *Args {
-	n := int64(aa.get(0).(IntIsh).Int())
-	vm.da(aa)
-	c := make(chan Any, int(n))
-	return join(vm, Chan(c))
-})
-
-var Ngroup Any = Func(func(vm *VM, aa *Args) *Args {
-	vm.da(aa)
-	return join(vm, NewGroup())
-})
-
 var Ntime *Map
+var Nsync *Map
 
 var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
-	return join(vm, Str{aa.get(0).Type()})
+	v := aa.get(0)
+	vm.da(aa)
+	if aa != nil {
+		return join(vm, Str{v.Type()})
+	}
+	return join(vm, Str{"nil"})
 })
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
@@ -909,7 +920,7 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
 	if v == nil {
-		return join(vm, libDef)
+		return join(vm, protoDef)
 	}
 	if m, is := v.(*Map); is {
 		return join(vm, m.meta)
@@ -918,12 +929,16 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 })
 
 func init() {
-	libDef = NewMap(MapData{
+	protoDef = NewMap(MapData{
 		Str{"string"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, Str{fmt.Sprintf("%v", aa.get(0))})
+			return join(vm, Str{aa.get(0).String()})
 		}),
 	})
-	libMap = NewMap(MapData{
+	protoInt = NewMap(MapData{})
+	protoInt.meta = protoDef
+	protoDec = NewMap(MapData{})
+	protoDec.meta = protoDef
+	protoMap = NewMap(MapData{
 		Str{"keys"}: Func(func(vm *VM, aa *Args) *Args {
 			keys := []Any{}
 			for k, _ := range aa.get(0).(*Map).data {
@@ -933,8 +948,8 @@ func init() {
 			return join(vm, NewList(keys))
 		}),
 	})
-	libMap.meta = libDef
-	libList = NewMap(MapData{
+	protoMap.meta = protoDef
+	protoList = NewMap(MapData{
 		Str{"push"}: Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
@@ -980,30 +995,39 @@ func init() {
 			}
 			return join(vm, Str{strings.Join(ls, tostring(j))})
 		}),
-	})
-	libList.meta = libDef
-	libChan = NewMap(MapData{
-		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
-			c := aa.get(0).(Chan)
+		Str{"sort"}: Func(func(vm *VM, aa *Args) *Args {
+			l := aa.get(0).(*List)
+			f := aa.get(1).(Func)
 			vm.da(aa)
-			return join(vm, <-c)
+			sort.SliceStable(l.data, func(a, b int) bool {
+				return truth(one(vm, f(vm, join(vm, l.data[a], l.data[b]))))
+			})
+			return join(vm, l)
+		}),
+	})
+	protoList.meta = protoDef
+	protoChan = NewMap(MapData{
+		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
+			c := aa.get(0).(*Chan)
+			vm.da(aa)
+			return join(vm, <-c.c)
 		}),
 		Str{"write"}: Func(func(vm *VM, aa *Args) *Args {
-			c := aa.get(0).(Chan)
+			c := aa.get(0).(*Chan)
 			a := aa.get(1)
 			vm.da(aa)
-			c <- a
+			c.c <- a
 			return join(vm, Bool(true))
 		}),
 		Str{"close"}: Func(func(vm *VM, aa *Args) *Args {
-			c := aa.get(0).(Chan)
+			c := aa.get(0).(*Chan)
 			vm.da(aa)
-			close(c)
+			close(c.c)
 			return nil
 		}),
 	})
-	libChan.meta = libDef
-	libGroup = NewMap(MapData{
+	protoChan.meta = protoDef
+	protoGroup = NewMap(MapData{
 		Str{"run"}: Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			f := aa.get(1).(Func)
@@ -1022,8 +1046,8 @@ func init() {
 			return join(vm, Bool(true))
 		}),
 	})
-	libGroup.meta = libDef
-	libStr = NewMap(MapData{
+	protoGroup.meta = protoDef
+	protoStr = NewMap(MapData{
 		Str{"split"}: Func(func(vm *VM, aa *Args) *Args {
 			s := tostring(aa.get(0))
 			j := tostring(aa.get(1))
@@ -1035,8 +1059,8 @@ func init() {
 			return join(vm, NewList(l))
 		}),
 	})
-	libStr.meta = libDef
-	libTick = NewMap(MapData{
+	protoStr.meta = protoDef
+	protoTick = NewMap(MapData{
 		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
@@ -1048,7 +1072,11 @@ func init() {
 			return join(vm, ti.Stop())
 		}),
 	})
-	libTick.meta = libDef
+	protoTick.meta = protoDef
+
+	protoInst = NewMap(MapData{})
+	protoInst.meta = protoDef
+
 	libTime = NewMap(MapData{
 		Str{"ms"}: Int(int64(time.Millisecond)),
 		Str{"ticker"}: Func(func(vm *VM, aa *Args) *Args {
@@ -1057,6 +1085,18 @@ func init() {
 			return join(vm, NewTicker(time.Duration(d)))
 		}),
 	})
-	libTime.meta = libDef
 	Ntime = libTime
+
+	libSync = NewMap(MapData{
+		Str{"group"}: Func(func(vm *VM, aa *Args) *Args {
+			vm.da(aa)
+			return join(vm, NewGroup())
+		}),
+		Str{"channel"}: Func(func(vm *VM, aa *Args) *Args {
+			n := int(aa.get(0).(IntIsh).Int())
+			vm.da(aa)
+			return join(vm, NewChan(n))
+		}),
+	})
+	Nsync = libSync
 }

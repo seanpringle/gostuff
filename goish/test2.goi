@@ -74,7 +74,7 @@ print("yo", l:len())
 print("a,b,c":split(","))
 print("a,b,c":split(","):join(":"))
 
-c = chan(10)
+c = sync.channel(10)
 c:write(1)
 c:write(2)
 c:write(3)
@@ -87,7 +87,7 @@ hi = function(g)
 	print("hi")
 end
 
-g = group()
+g = sync.group()
 g:run(hi)
 g:run(hi)
 g:run(hi)
@@ -122,29 +122,15 @@ for 10 do(i)
 	print(i)
 end
 
-blinker = function()
-	lock = chan(1)
-	jobs = []
-	return do(fn)
-		lock:write()
-		if fn == nil then
-			for jobs do(i, job)
-				job()
-			end
-			jobs = []
-		else
-			jobs:push(fn)
-		end
-		lock:read()
-	end
-end
-
-blink = blinker()
-blink(do print("hello world") end)
-blink(do print("hello world") end)
-blink(do print("hello world") end)
+blink = sync.queue()
+blink:write(do print("hello world") end)
+blink:write(do print("hello world") end)
+blink:write(do print("hello world") end)
 print("and...")
-blink()
+
+for blink do(fn)
+	print(fn, fn())
+end
 
 l = [1,2,3]
 print(l\0)
@@ -156,3 +142,9 @@ m\"b"\"c" = 5
 print(m\"b"\"c")
 
 print("length", #l, #m)
+
+
+print(0:max(2))
+
+
+print([2,4,6,8,3]:sort(do(a, b) return a < b end))

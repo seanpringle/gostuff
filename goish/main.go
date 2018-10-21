@@ -641,6 +641,10 @@ func (p *Parser) expression(block *NodeBlock) Node {
 			break
 		}
 
+		if p.scan() == '-' && p.char(1) == '-' {
+			break
+		}
+
 		if !p.issymbol(p.scan()) && !p.peek("or") && !p.peek("and") {
 			break
 		}

@@ -18,7 +18,7 @@ func NewNodeMap(t map[Keyer]Node) *NodeMap {
 func (nt *NodeMap) Format() string {
 	pairs := []string{}
 	for k, v := range nt.table {
-		pairs = append(pairs, fmt.Sprintf("%s: %s", k.FormatKey(), v.Format()))
+		pairs = append(pairs, fmt.Sprintf("%s: %s", k.FormatKey(), FormatOne(v)))
 	}
 	return fmt.Sprintf("NewMap(MapData{%s})", strings.Join(pairs, ","))
 }

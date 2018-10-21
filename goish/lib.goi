@@ -4,72 +4,162 @@ nil = []:pop()
 
 function()
 	p = getprototype(nil)
-	p.type = function(self)
-		return type(p)
+
+	p.type = function(any)
+		return type(any)
 	end
-	p.len = function(self)
-		return #self
+
+	p.len = function(any)
+		return #any
 	end
+
 end()
 
 function()
 	p = getprototype(0)
-	p.iterate = function(self)
+
+	p.iterate = function(limit)
 		i = 0
 		return do
-			if i < self then
+			if i < limit then
 				return i++
 			end
 		end
 	end
+
+	p.max = function(a, b)
+		return a > b and a or b
+	end
+
+	p.min = function(a, b)
+		return a < b and a or b
+	end
+
 end()
 
 function()
-	l = getprototype([])
-	l.iterate = function(self)
-		i = 0
-		return do
-			if i < self:len() then
-				return i++, self:get(i-1)
-			end
-		end
+	p = getprototype(1.0)
+
+	p.max = function(a, b)
+		return a > b and a or b
 	end
-	l.set = function(self, pos, val)
-		self\pos = val
+
+	p.min = function(a, b)
+		return a < b and a or b
 	end
-	l.get = function(self, pos)
-		return self\pos
-	end
+
 end()
 
 function()
-	m = getprototype({})
-	m.iterate = function(self)
+	p = getprototype([])
+
+	p.iterate = function(list)
 		i = 0
-		keys = self:keys()
 		return do
-			if i < keys:len() then
-				key = keys:get(i++)
-				return key, self:get(key)
+			if i < #list then
+				return i, list\i++
 			end
 		end
 	end
-	m.set = function(self, pos, val)
-		self\pos = val
+
+	p.set = function(list, pos, val)
+		list\pos = val
 	end
-	m.get = function(self, pos)
-		return self\pos
+
+	p.get = function(list, pos)
+		return list\pos
 	end
+
+	p.max = function(a, b)
+		return #a > #b and a or b
+	end
+
+	p.min = function(a, b)
+		return #a < #b and a or b
+	end
+
+end()
+
+function()
+	p = getprototype({})
+
+	p.iterate = function(m)
+		i = 0
+		keys = m:keys()
+		return do
+			if i < #keys then
+				key = keys\i++
+				return key, m\key
+			end
+		end
+	end
+
+	p.set = function(m, pos, val)
+		m\pos = val
+	end
+
+	p.get = function(m, pos)
+		return m\pos
+	end
+
+	p.max = function(a, b)
+		return #a > #b and a or b
+	end
+
+	p.min = function(a, b)
+		return #a < #b and a or b
+	end
+
 end()
 
 function()
 	ti = time.ticker(1000000)
 	tick = getprototype(ti)
-	tick.iterate = function(self)
+	ti:stop()
+
+	tick.iterate = function(t)
 		i = 0
 		return do
-			return i++, self:read()
+			return i++, t:read()
 		end
 	end
-	ti:stop()
+
+end()
+
+function()
+	protoQueue = {
+
+		read = function(q)
+			q.lock:write()
+			job = q.jobs:shift()
+			q.lock:read()
+			return job
+		end,
+
+		write = function(q, fn)
+			q.lock:write()
+			q.jobs:push(fn)
+			q.lock:read()
+		end,
+
+		iterate = function(q)
+			q.lock:write()
+			jobs = q.jobs
+			q.jobs = []
+			q.lock:read()
+			return do
+				return jobs:shift()
+			end
+		end,
+	}
+
+	sync.queue = function()
+		return setprototype({
+				lock = sync.channel(1),
+				jobs = [],
+			},
+			protoQueue,
+		)
+	end
+
 end()

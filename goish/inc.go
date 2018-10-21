@@ -25,7 +25,7 @@ func (ni *NodeInc) Produces() int {
 }
 
 func (ni *NodeInc) Precedence() int {
-	return 5
+	return 9
 }
 
 func (ni *NodeInc) Format() string {
@@ -33,7 +33,7 @@ func (ni *NodeInc) Format() string {
 	if _, is := ni.item.(*NodeName); is {
 		return fmt.Sprintf("func() Any { v := one(vm, %s); %s = add(v, Int(1)); return v; }()", loc, loc)
 	}
-	panic("post-increment only supported on local variables")
+	panic(fmt.Sprintf("post-increment only supported on local variables: %v", ni.item.Format()))
 }
 
 func (ni *NodeInc) String() string {

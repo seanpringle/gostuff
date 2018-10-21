@@ -17,7 +17,7 @@ func NewNodeUntil(flag, body Node) *NodeUntil {
 }
 
 func (nf *NodeUntil) Format() string {
-	return fmt.Sprintf("loop(func() { for !truth(%s) { %s(Tup{}) } })", nf.flag.Format(), nf.body.Format())
+	return fmt.Sprintf("loop(func() { for !truth(%s) { vm.da(call(vm, %s, nil)) } })", nf.flag.Format(), nf.body.Format())
 }
 
 func (nf *NodeUntil) String() string {
