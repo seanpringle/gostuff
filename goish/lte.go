@@ -36,6 +36,10 @@ func (no *NodeLte) FormatBool() string {
 	return fmt.Sprintf("lte(%s, %s)", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
+func (no *NodeLte) FormatOne() string {
+	return no.Format()
+}
+
 func (no *NodeLte) String() string {
 	return fmt.Sprintf("NodeLte{%s}", no.args)
 }

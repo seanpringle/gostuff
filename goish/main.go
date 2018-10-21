@@ -284,6 +284,11 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeMethod()
 	}
 
+	if p.scan() == '\\' {
+		p.take()
+		return NewNodeField()
+	}
+
 	if p.scan() == '=' && p.char(1) == '=' {
 		p.take()
 		p.take()

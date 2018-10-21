@@ -122,3 +122,35 @@ for 10 do(i)
 	print(i)
 end
 
+blinker = function()
+	lock = chan(1)
+	jobs = []
+	return do(fn)
+		lock:write()
+		if fn == nil then
+			for jobs do(i, job)
+				job()
+			end
+			jobs = []
+		else
+			jobs:push(fn)
+		end
+		lock:read()
+	end
+end
+
+blink = blinker()
+blink(do print("hello world") end)
+blink(do print("hello world") end)
+blink(do print("hello world") end)
+print("and...")
+blink()
+
+l = [1,2,3]
+print(l\0)
+
+m = { a = 1, b = { c = 4 } }
+
+print(m\"b"\"c")
+m\"b"\"c" = 5
+print(m\"b"\"c")

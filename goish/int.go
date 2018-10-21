@@ -31,5 +31,5 @@ func (li *NodeLitInt) Produces() int {
 }
 
 func (li *NodeLitInt) FormatKey() string {
-	return fmt.Sprintf(`"%d"`, li.value)
+	return fmt.Sprintf(`Int(%d)`, li.value)
 }

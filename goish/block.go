@@ -58,8 +58,10 @@ func (nb *NodeBlock) Format() string {
 			}
 		}
 		if na, is := n.(*NodeAssign); is {
-			statements = append(statements, fmt.Sprintf("vm.da(%s)", na.Format()))
-			continue
+			if na.Produces() > 1 {
+				statements = append(statements, fmt.Sprintf("vm.da(%s)", na.Format()))
+				continue
+			}
 		}
 		statements = append(statements, n.Format())
 	}

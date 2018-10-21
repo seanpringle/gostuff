@@ -787,12 +787,35 @@ func find(t Any, key Any) Any {
 	return nil
 }
 
+func field(t Any, key Any) Any {
+	if t != nil {
+		if _, is := t.(*Map); is {
+			return find(t, key)
+		}
+		if l, is := t.(*List); is {
+			return l.Get(key)
+		}
+		panic(fmt.Sprintf("invalid retrieve operation: %v", t))
+	}
+	return nil
+}
+
 func method(t Any, key Any) (Any, Any) {
 	return t, find(t, key)
 }
 
 func store(t Any, key Any, val Any) Any {
-	t.(*Map).Set(key, val)
+	if t != nil {
+		if m, is := t.(*Map); is {
+			m.Set(key, val)
+			return val
+		}
+		if l, is := t.(*List); is {
+			l.Set(key, val)
+			return val
+		}
+		panic(fmt.Sprintf("invalid store operation: %v", t))
+	}
 	return val
 }
 
@@ -849,11 +872,13 @@ var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
 
 var Nchan Any = Func(func(vm *VM, aa *Args) *Args {
 	n := int64(aa.get(0).(IntIsh).Int())
+	vm.da(aa)
 	c := make(chan Any, int(n))
 	return join(vm, Chan(c))
 })
 
 var Ngroup Any = Func(func(vm *VM, aa *Args) *Args {
+	vm.da(aa)
 	return join(vm, NewGroup())
 })
 
@@ -866,7 +891,10 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	if m, is := aa.get(0).(*Map); is {
 		m.meta = aa.get(1)
-		return nil
+		vm.da(aa)
+		aa = vm.ga(1)
+		aa.set(0, m)
+		return aa
 	}
 	panic(fmt.Sprintf("cannot set prototype"))
 })
@@ -924,6 +952,23 @@ func init() {
 			if len(l.data) < n {
 				v = l.data[n]
 				l.data = l.data[0:n]
+			}
+			return join(vm, v)
+		}),
+		Str{"shove"}: Func(func(vm *VM, aa *Args) *Args {
+			l := aa.get(0).(*List)
+			v := aa.get(1)
+			vm.da(aa)
+			l.data = append([]Any{v}, l.data...)
+			return join(vm, l)
+		}),
+		Str{"shift"}: Func(func(vm *VM, aa *Args) *Args {
+			l := aa.get(0).(*List)
+			vm.da(aa)
+			var v Any
+			if len(l.data) > 0 {
+				v = l.data[0]
+				l.data = l.data[1:]
 			}
 			return join(vm, v)
 		}),

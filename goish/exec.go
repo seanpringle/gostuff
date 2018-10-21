@@ -32,7 +32,7 @@ func (ne *NodeExec) Precedence() int {
 func (ne *NodeExec) Format() string {
 	args := ne.args
 	if args == nil {
-		args = NewNodeLitInt(0)
+		args = NewNodeLitNil()
 	}
 	if m, is := ne.name.(*NodeMethod); is {
 		return fmt.Sprintf("func() *Args { t, m := %s; return call(vm, m, join(vm, t, %s)); }()", m.Format(), args.Format())

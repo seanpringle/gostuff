@@ -36,6 +36,10 @@ func (no *NodeEq) FormatBool() string {
 	return fmt.Sprintf("eq(%s, %s)", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
+func (no *NodeEq) FormatOne() string {
+	return no.Format()
+}
+
 func (no *NodeEq) String() string {
 	return fmt.Sprintf("NodeEq{%s}", no.args)
 }

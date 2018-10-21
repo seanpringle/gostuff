@@ -2,8 +2,9 @@ true = 0 < 1
 false = 1 < 0
 nil = []:pop()
 
-function(proto)
-	proto.iterate = function(self)
+function()
+	p = getprototype(0)
+	p.iterate = function(self)
 		i = 0
 		return do
 			if i < self then
@@ -11,10 +12,11 @@ function(proto)
 			end
 		end
 	end
-end(getprototype(0))
+end()
 
-function(list)
-	list.iterate = function(self)
+function()
+	l = getprototype([])
+	l.iterate = function(self)
 		i = 0
 		return do
 			if i < self:len() then
@@ -22,10 +24,11 @@ function(list)
 			end
 		end
 	end
-end(getprototype([]))
+end()
 
-function(map)
-	map.iterate = function(self)
+function()
+	m = getprototype({})
+	m.iterate = function(self)
 		i = 0
 		keys = self:keys()
 		return do
@@ -35,10 +38,10 @@ function(map)
 			end
 		end
 	end
-end(getprototype({}))
+end()
 
 function()
-	ti = time.ticker(1)
+	ti = time.ticker(1000000)
 	tick = getprototype(ti)
 	tick.iterate = function(self)
 		i = 0

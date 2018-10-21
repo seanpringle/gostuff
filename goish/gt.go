@@ -36,6 +36,10 @@ func (no *NodeGt) FormatBool() string {
 	return fmt.Sprintf("gt(%s, %s)", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
+func (no *NodeGt) FormatOne() string {
+	return no.Format()
+}
+
 func (no *NodeGt) String() string {
 	return fmt.Sprintf("NodeGt{%s}", no.args)
 }
