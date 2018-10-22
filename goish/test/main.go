@@ -149,16 +149,14 @@ func (b Bool) Lib() *Map {
 	return protoDef
 }
 
-type Str struct {
-	s string
-}
+type Str string
 
 func (s Str) Str() Str {
 	return s
 }
 
 func (s Str) String() string {
-	return s.s
+	return string(s)
 }
 
 func (s Str) Type() string {
@@ -166,7 +164,7 @@ func (s Str) Type() string {
 }
 
 func (s Str) Len() int64 {
-	return int64(len(s.s))
+	return int64(len(s))
 }
 
 func (s Str) Lib() *Map {
@@ -174,7 +172,7 @@ func (s Str) Lib() *Map {
 }
 
 func (s Str) Bool() Bool {
-	return Bool(len(s.s) > 0)
+	return Bool(len(s) > 0)
 }
 
 type Int int64
@@ -411,10 +409,10 @@ func (t *Map) String() string {
 		pairs := []string{}
 		for k, v := range t.data {
 			if _, is := v.(*Map); is {
-				v = Str{"map"}
+				v = Str("map")
 			}
 			if _, is := v.(*List); is {
-				v = Str{"slice"}
+				v = Str("slice")
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 			pairs = append(pairs, fmt.Sprintf("%s = %s", k.String(), v.String()))
@@ -448,10 +446,10 @@ func (s *List) String() string {
 	items := []string{}
 	for _, v := range s.data {
 		if _, is := v.(*Map); is {
-			v = Str{"map"}
+			v = Str("map")
 		}
 		if _, is := v.(*List); is {
-			v = Str{"slice"}
+			v = Str("slice")
 		}
 		items = append(items, tostring(v))
 	}
@@ -597,7 +595,7 @@ func add(a, b Any) Any {
 		}
 	}
 	if as, is := a.(StrIsh); is {
-		return Str{as.Str().s + tostring(b)}
+		return Str(as.Str().String() + tostring(b))
 	}
 	panic(fmt.Errorf("invalid addition: %v %v", a, b))
 }
@@ -716,7 +714,7 @@ func lt(a, b Any) bool {
 	}
 	if as, is := a.(Str); is {
 		if bs, is := b.(Str); is {
-			return strings.Compare(as.s, bs.s) < 0
+			return strings.Compare(string(as), string(bs)) < 0
 		}
 	}
 	panic(fmt.Errorf("invalid comparison (less): %v %v", a, b))
@@ -863,7 +861,7 @@ func loop(fn func()) {
 }
 
 func trymethod(t Any, k string, def Any) Any {
-	t, m := method(t, Str{k})
+	t, m := method(t, Str(k))
 	if m != nil {
 		vm := &VM{}
 		return call(vm, m, join(vm, t)).get(0)
@@ -872,7 +870,7 @@ func trymethod(t Any, k string, def Any) Any {
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", Str{"nil"}).(Str).s
+	return trymethod(s, "string", Str("nil")).(Str).String()
 }
 
 func length(v Any) Any {
@@ -901,9 +899,9 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
 	vm.da(aa)
 	if aa != nil {
-		return join(vm, Str{v.Type()})
+		return join(vm, Str(v.Type()))
 	}
-	return join(vm, Str{"nil"})
+	return join(vm, Str("nil"))
 })
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
@@ -930,8 +928,8 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 
 func init() {
 	protoDef = NewMap(MapData{
-		Str{"string"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, Str{aa.get(0).String()})
+		Str("string"): Func(func(vm *VM, aa *Args) *Args {
+			return join(vm, Str(aa.get(0).String()))
 		}),
 	})
 	protoInt = NewMap(MapData{})
@@ -939,7 +937,7 @@ func init() {
 	protoDec = NewMap(MapData{})
 	protoDec.meta = protoDef
 	protoMap = NewMap(MapData{
-		Str{"keys"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("keys"): Func(func(vm *VM, aa *Args) *Args {
 			keys := []Any{}
 			for k, _ := range aa.get(0).(*Map).data {
 				keys = append(keys, k)
@@ -950,14 +948,14 @@ func init() {
 	})
 	protoMap.meta = protoDef
 	protoList = NewMap(MapData{
-		Str{"push"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("push"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append(l.data, v)
 			return join(vm, l)
 		}),
-		Str{"pop"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("pop"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			n := len(l.data) - 1
 			vm.da(aa)
@@ -968,14 +966,14 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str{"shove"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("shove"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append([]Any{v}, l.data...)
 			return join(vm, l)
 		}),
-		Str{"shift"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("shift"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			vm.da(aa)
 			var v Any
@@ -985,7 +983,7 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str{"join"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("join"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			j := aa.get(1)
 			vm.da(aa)
@@ -993,9 +991,9 @@ func init() {
 			for _, s := range l.data {
 				ls = append(ls, tostring(s))
 			}
-			return join(vm, Str{strings.Join(ls, tostring(j))})
+			return join(vm, Str(strings.Join(ls, tostring(j))))
 		}),
-		Str{"sort"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("sort"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			f := aa.get(1).(Func)
 			vm.da(aa)
@@ -1007,19 +1005,19 @@ func init() {
 	})
 	protoList.meta = protoDef
 	protoChan = NewMap(MapData{
-		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("read"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			return join(vm, <-c.c)
 		}),
-		Str{"write"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("write"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			a := aa.get(1)
 			vm.da(aa)
 			c.c <- a
 			return join(vm, Bool(true))
 		}),
-		Str{"close"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("close"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			close(c.c)
@@ -1028,7 +1026,7 @@ func init() {
 	})
 	protoChan.meta = protoDef
 	protoGroup = NewMap(MapData{
-		Str{"run"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("run"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			f := aa.get(1).(Func)
 			ab := vm.ga(aa.len() - 2)
@@ -1039,7 +1037,7 @@ func init() {
 			vm.da(aa)
 			return join(vm, Bool(true))
 		}),
-		Str{"wait"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("wait"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			vm.da(aa)
 			g.Wait()
@@ -1048,25 +1046,25 @@ func init() {
 	})
 	protoGroup.meta = protoDef
 	protoStr = NewMap(MapData{
-		Str{"split"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("split"): Func(func(vm *VM, aa *Args) *Args {
 			s := tostring(aa.get(0))
 			j := tostring(aa.get(1))
 			vm.da(aa)
 			l := []Any{}
 			for _, p := range strings.Split(s, j) {
-				l = append(l, Str{p})
+				l = append(l, Str(p))
 			}
 			return join(vm, NewList(l))
 		}),
 	})
 	protoStr.meta = protoDef
 	protoTick = NewMap(MapData{
-		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("read"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Read())
 		}),
-		Str{"stop"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("stop"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Stop())
@@ -1078,8 +1076,8 @@ func init() {
 	protoInst.meta = protoDef
 
 	libTime = NewMap(MapData{
-		Str{"ms"}: Int(int64(time.Millisecond)),
-		Str{"ticker"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("ms"): Int(int64(time.Millisecond)),
+		Str("ticker"): Func(func(vm *VM, aa *Args) *Args {
 			d := int64(aa.get(0).(Int))
 			vm.da(aa)
 			return join(vm, NewTicker(time.Duration(d)))
@@ -1088,11 +1086,11 @@ func init() {
 	Ntime = libTime
 
 	libSync = NewMap(MapData{
-		Str{"group"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("group"): Func(func(vm *VM, aa *Args) *Args {
 			vm.da(aa)
 			return join(vm, NewGroup())
 		}),
-		Str{"channel"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("channel"): Func(func(vm *VM, aa *Args) *Args {
 			n := int(aa.get(0).(IntIsh).Int())
 			vm.da(aa)
 			return join(vm, NewChan(n))
@@ -1101,26 +1099,25 @@ func init() {
 	Nsync = libSync
 }
 
-var S2 Str = Str{"type"}
-var S6 Str = Str{"min"}
-var S10 Str = Str{"ticker"}
-var S13 Str = Str{"lock"}
-var S19 Str = Str{"queue"}
-var S20 Str = Str{"sub"}
-var S4 Str = Str{"iterate"}
-var S5 Str = Str{"max"}
-var S7 Str = Str{"set"}
-var S12 Str = Str{"read"}
-var S15 Str = Str{"jobs"}
-var S3 Str = Str{"len"}
-var S16 Str = Str{"shift"}
-var S18 Str = Str{"channel"}
-var S1 Str = Str{"pop"}
-var S8 Str = Str{"get"}
-var S9 Str = Str{"keys"}
-var S11 Str = Str{"stop"}
-var S14 Str = Str{"write"}
-var S17 Str = Str{"push"}
+const S10 Str = Str("ticker")
+const S15 Str = Str("jobs")
+const S1 Str = Str("pop")
+const S8 Str = Str("get")
+const S13 Str = Str("lock")
+const S17 Str = Str("push")
+const S18 Str = Str("channel")
+const S6 Str = Str("min")
+const S11 Str = Str("stop")
+const S4 Str = Str("iterate")
+const S5 Str = Str("max")
+const S7 Str = Str("set")
+const S9 Str = Str("keys")
+const S12 Str = Str("read")
+const S2 Str = Str("type")
+const S3 Str = Str("len")
+const S19 Str = Str("queue")
+const S14 Str = Str("write")
+const S16 Str = Str("shift")
 
 func main() {
 
@@ -1136,14 +1133,31 @@ func main() {
 	vm := &VM{}
 
 	{
+		var Ninteger Any
+		var Nmap Any
+		var Ntrue Any
 		var Nnil Any
 		var Nfib Any
-		var Ntrue Any
+		var Nsuper Any
+		var Ndecimal Any
+		var Nlist Any
 		var Nfalse Any
+		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Nsuper = a; return a }()
+		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Ninteger = a; return a }()
+		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Ndecimal = a; return a }()
+		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, NewList([]Any{})))); Nlist = a; return a }()
+		func() Any {
+			a := one(vm, call(vm, Ngetprototype, join(vm, NewMap(MapData{}))))
+			Nmap = a
+			return a
+		}()
 		func() Any { a := Bool(lt(Int(0), Int(1))); Ntrue = a; return a }()
 		func() Any { a := Bool(lt(Int(1), Int(0))); Nfalse = a; return a }()
 		func() Any {
-			a := one(vm, func() *Args { t, m := method(NewList([]Any{}), S1 /* pop */); return call(vm, m, join(vm, t, nil)) }())
+			a := one(vm, func() *Args {
+				t, m := method(NewList([]Any{}), S1 /* pop */)
+				return call(vm, m, join(vm, t, nil))
+			}())
 			Nnil = a
 			return a
 		}()
@@ -1151,7 +1165,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
-				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Np = a; return a }()
+				func() Any { a := Nsuper; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Nany := aa.get(0)
@@ -1185,7 +1199,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
-				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Np = a; return a }()
+				func() Any { a := Ninteger; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Nlimit := aa.get(0)
@@ -1284,7 +1298,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
-				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Dec(1)))); Np = a; return a }()
+				func() Any { a := Ndecimal; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Na := aa.get(0)
@@ -1358,7 +1372,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
-				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, NewList([]Any{})))); Np = a; return a }()
+				func() Any { a := Nlist; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Nlist := aa.get(0)
@@ -1489,7 +1503,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
-				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, NewMap(MapData{})))); Np = a; return a }()
+				func() Any { a := Nmap; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Nm := aa.get(0)
@@ -1501,7 +1515,10 @@ func main() {
 							var Nkey Any
 							func() Any { a := Int(0); Ni = a; return a }()
 							func() Any {
-								a := one(vm, func() *Args { t, m := method(Nm, S9 /* keys */); return call(vm, m, join(vm, t, nil)) }())
+								a := one(vm, func() *Args {
+									t, m := method(Nm, S9 /* keys */)
+									return call(vm, m, join(vm, t, nil))
+								}())
 								Nkeys = a
 								return a
 							}()
@@ -1639,7 +1656,10 @@ func main() {
 					return a
 				}()
 				func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nti))); Ntick = a; return a }()
-				vm.da(func() *Args { t, m := method(Nti, S11 /* stop */); return call(vm, m, join(vm, t, nil)) }())
+				vm.da(func() *Args {
+					t, m := method(Nti, S11 /* stop */)
+					return call(vm, m, join(vm, t, nil))
+				}())
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						Nt := aa.get(0)
@@ -1651,7 +1671,10 @@ func main() {
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
 								{
-									return join(vm, func() Any { v := one(vm, Ni); Ni = add(v, Int(1)); return v }(), func() *Args { t, m := method(Nt, S12 /* read */); return call(vm, m, join(vm, t, nil)) }())
+									return join(vm, func() Any { v := one(vm, Ni); Ni = add(v, Int(1)); return v }(), func() *Args {
+										t, m := method(Nt, S12 /* read */)
+										return call(vm, m, join(vm, t, nil))
+									}())
 								}
 								return nil
 							}))
@@ -1669,78 +1692,84 @@ func main() {
 			{
 				var NprotoQueue Any
 				func() Any {
-					a := one(vm, NewMap(MapData{S12 /* read */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
-						Nq := aa.get(0)
-						noop(Nq)
-						vm.da(aa)
-						{
-							var Njob Any
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-							func() Any {
-								a := one(vm, func() *Args {
-									t, m := method(find(Nq, S15 /* jobs */), S16 /* shift */)
+					a := one(vm, NewMap(MapData{
+						S12 /* read */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+							Nq := aa.get(0)
+							noop(Nq)
+							vm.da(aa)
+							{
+								var Njob Any
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
 									return call(vm, m, join(vm, t, nil))
 								}())
-								Njob = a
-								return a
-							}()
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-							return join(vm, Njob)
-						}
-						return nil
-					})), S14 /* write */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
-						Nq := aa.get(0)
-						noop(Nq)
-						Nfn := aa.get(1)
-						noop(Nfn)
-						vm.da(aa)
-						{
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S15 /* jobs */), S17 /* push */)
-								return call(vm, m, join(vm, t, Nfn))
-							}())
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-						}
-						return nil
-					})), S4 /* iterate */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
-						Nq := aa.get(0)
-						noop(Nq)
-						vm.da(aa)
-						{
-							var Njobs Any
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-							func() Any { a := one(vm, find(Nq, S15 /* jobs */)); Njobs = a; return a }()
-							func() Any { a := one(vm, NewList([]Any{})); store(Nq, S15 /* jobs */, a); return a }()
-							vm.da(func() *Args {
-								t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
-								return call(vm, m, join(vm, t, nil))
-							}())
-							return join(vm, Func(func(vm *VM, aa *Args) *Args {
-								vm.da(aa)
-								{
-									return join(vm, func() *Args { t, m := method(Njobs, S16 /* shift */); return call(vm, m, join(vm, t, nil)) }())
-								}
-								return nil
-							}))
-						}
-						return nil
-					}))}))
+								func() Any {
+									a := one(vm, func() *Args {
+										t, m := method(find(Nq, S15 /* jobs */), S16 /* shift */)
+										return call(vm, m, join(vm, t, nil))
+									}())
+									Njob = a
+									return a
+								}()
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+								return join(vm, Njob)
+							}
+							return nil
+						})),
+						S14 /* write */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+							Nq := aa.get(0)
+							noop(Nq)
+							Nfn := aa.get(1)
+							noop(Nfn)
+							vm.da(aa)
+							{
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S15 /* jobs */), S17 /* push */)
+									return call(vm, m, join(vm, t, Nfn))
+								}())
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+							}
+							return nil
+						})),
+						S4 /* iterate */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+							Nq := aa.get(0)
+							noop(Nq)
+							vm.da(aa)
+							{
+								var Njobs Any
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S14 /* write */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+								func() Any { a := one(vm, find(Nq, S15 /* jobs */)); Njobs = a; return a }()
+								func() Any { a := one(vm, NewList([]Any{})); store(Nq, S15 /* jobs */, a); return a }()
+								vm.da(func() *Args {
+									t, m := method(find(Nq, S13 /* lock */), S12 /* read */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+								return join(vm, Func(func(vm *VM, aa *Args) *Args {
+									vm.da(aa)
+									{
+										return join(vm, func() *Args {
+											t, m := method(Njobs, S16 /* shift */)
+											return call(vm, m, join(vm, t, nil))
+										}())
+									}
+									return nil
+								}))
+							}
+							return nil
+						}))}))
 					NprotoQueue = a
 					return a
 				}()
@@ -1748,7 +1777,9 @@ func main() {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						vm.da(aa)
 						{
-							return join(vm, call(vm, Nsetprototype, join(vm, NewMap(MapData{S13 /* lock */ : one(vm, call(vm, find(Nsync, S18 /* channel */), join(vm, Int(1)))), S15 /* jobs */ : one(vm, NewList([]Any{}))}), NprotoQueue)))
+							return join(vm, call(vm, Nsetprototype, join(vm, NewMap(MapData{
+								S13 /* lock */ : one(vm, call(vm, find(Nsync, S18 /* channel */), join(vm, Int(1)))),
+								S15 /* jobs */ : one(vm, NewList([]Any{}))}), NprotoQueue)))
 						}
 						return nil
 					}))
@@ -1770,7 +1801,6 @@ func main() {
 						}
 					}
 					return join(vm, add(one(vm, call(vm, Nfib, join(vm, sub(Nn, Int(2))))), one(vm, call(vm, Nfib, join(vm, sub(Nn, Int(1)))))))
-					return join(vm, add(one(vm, call(vm, Nfib, join(vm, func() *Args { t, m := method(Nn, S20 /* sub */); return call(vm, m, join(vm, t, Int(2))) }()))), one(vm, call(vm, Nfib, join(vm, func() *Args { t, m := method(Nn, S20 /* sub */); return call(vm, m, join(vm, t, Int(1))) }())))))
 				}
 				return nil
 			}))

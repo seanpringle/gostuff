@@ -1,9 +1,14 @@
-true = 0 < 1
-false = 1 < 0
-nil = []:pop()
+super   = getprototype(nil)
+integer = getprototype(0)
+decimal = getprototype(0)
+list    = getprototype([])
+map     = getprototype({})
+true    = 0 < 1
+false   = 1 < 0
+nil     = []:pop()
 
 function()
-	p = getprototype(nil)
+	p = super
 
 	p.type = function(any)
 		return type(any)
@@ -16,7 +21,7 @@ function()
 end()
 
 function()
-	p = getprototype(0)
+	p = integer
 
 	p.iterate = function(limit)
 		i = 0
@@ -38,7 +43,7 @@ function()
 end()
 
 function()
-	p = getprototype(1.0)
+	p = decimal
 
 	p.max = function(a, b)
 		return a > b and a or b
@@ -51,7 +56,7 @@ function()
 end()
 
 function()
-	p = getprototype([])
+	p = list
 
 	p.iterate = function(list)
 		i = 0
@@ -81,7 +86,7 @@ function()
 end()
 
 function()
-	p = getprototype({})
+	p = map
 
 	p.iterate = function(m)
 		i = 0

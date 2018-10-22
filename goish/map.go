@@ -20,7 +20,7 @@ func (nt *NodeMap) Format() string {
 	for k, v := range nt.table {
 		pairs = append(pairs, fmt.Sprintf("%s: %s", k.FormatKey(), FormatOne(v)))
 	}
-	return fmt.Sprintf("NewMap(MapData{%s})", strings.Join(pairs, ","))
+	return fmt.Sprintf("NewMap(MapData{\n%s})", strings.Join(pairs, ",\n"))
 }
 
 func (nt *NodeMap) String() string {

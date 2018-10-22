@@ -149,16 +149,14 @@ func (b Bool) Lib() *Map {
 	return protoDef
 }
 
-type Str struct {
-	s string
-}
+type Str string
 
 func (s Str) Str() Str {
 	return s
 }
 
 func (s Str) String() string {
-	return s.s
+	return string(s)
 }
 
 func (s Str) Type() string {
@@ -166,7 +164,7 @@ func (s Str) Type() string {
 }
 
 func (s Str) Len() int64 {
-	return int64(len(s.s))
+	return int64(len(s))
 }
 
 func (s Str) Lib() *Map {
@@ -174,7 +172,7 @@ func (s Str) Lib() *Map {
 }
 
 func (s Str) Bool() Bool {
-	return Bool(len(s.s) > 0)
+	return Bool(len(s) > 0)
 }
 
 type Int int64
@@ -411,10 +409,10 @@ func (t *Map) String() string {
 		pairs := []string{}
 		for k, v := range t.data {
 			if _, is := v.(*Map); is {
-				v = Str{"map"}
+				v = Str("map")
 			}
 			if _, is := v.(*List); is {
-				v = Str{"slice"}
+				v = Str("slice")
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 			pairs = append(pairs, fmt.Sprintf("%s = %s", k.String(), v.String()))
@@ -448,10 +446,10 @@ func (s *List) String() string {
 	items := []string{}
 	for _, v := range s.data {
 		if _, is := v.(*Map); is {
-			v = Str{"map"}
+			v = Str("map")
 		}
 		if _, is := v.(*List); is {
-			v = Str{"slice"}
+			v = Str("slice")
 		}
 		items = append(items, tostring(v))
 	}
@@ -597,7 +595,7 @@ func add(a, b Any) Any {
 		}
 	}
 	if as, is := a.(StrIsh); is {
-		return Str{as.Str().s + tostring(b)}
+		return Str(as.Str().String() + tostring(b))
 	}
 	panic(fmt.Errorf("invalid addition: %v %v", a, b))
 }
@@ -716,7 +714,7 @@ func lt(a, b Any) bool {
 	}
 	if as, is := a.(Str); is {
 		if bs, is := b.(Str); is {
-			return strings.Compare(as.s, bs.s) < 0
+			return strings.Compare(string(as), string(bs)) < 0
 		}
 	}
 	panic(fmt.Errorf("invalid comparison (less): %v %v", a, b))
@@ -863,7 +861,7 @@ func loop(fn func()) {
 }
 
 func trymethod(t Any, k string, def Any) Any {
-	t, m := method(t, Str{k})
+	t, m := method(t, Str(k))
 	if m != nil {
 		vm := &VM{}
 		return call(vm, m, join(vm, t)).get(0)
@@ -872,7 +870,7 @@ func trymethod(t Any, k string, def Any) Any {
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", Str{"nil"}).(Str).s
+	return trymethod(s, "string", Str("nil")).(Str).String()
 }
 
 func length(v Any) Any {
@@ -901,9 +899,9 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
 	vm.da(aa)
 	if aa != nil {
-		return join(vm, Str{v.Type()})
+		return join(vm, Str(v.Type()))
 	}
-	return join(vm, Str{"nil"})
+	return join(vm, Str("nil"))
 })
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
@@ -930,8 +928,8 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 
 func init() {
 	protoDef = NewMap(MapData{
-		Str{"string"}: Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, Str{aa.get(0).String()})
+		Str("string"): Func(func(vm *VM, aa *Args) *Args {
+			return join(vm, Str(aa.get(0).String()))
 		}),
 	})
 	protoInt = NewMap(MapData{})
@@ -939,7 +937,7 @@ func init() {
 	protoDec = NewMap(MapData{})
 	protoDec.meta = protoDef
 	protoMap = NewMap(MapData{
-		Str{"keys"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("keys"): Func(func(vm *VM, aa *Args) *Args {
 			keys := []Any{}
 			for k, _ := range aa.get(0).(*Map).data {
 				keys = append(keys, k)
@@ -950,14 +948,14 @@ func init() {
 	})
 	protoMap.meta = protoDef
 	protoList = NewMap(MapData{
-		Str{"push"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("push"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append(l.data, v)
 			return join(vm, l)
 		}),
-		Str{"pop"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("pop"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			n := len(l.data) - 1
 			vm.da(aa)
@@ -968,14 +966,14 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str{"shove"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("shove"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append([]Any{v}, l.data...)
 			return join(vm, l)
 		}),
-		Str{"shift"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("shift"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			vm.da(aa)
 			var v Any
@@ -985,7 +983,7 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str{"join"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("join"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			j := aa.get(1)
 			vm.da(aa)
@@ -993,9 +991,9 @@ func init() {
 			for _, s := range l.data {
 				ls = append(ls, tostring(s))
 			}
-			return join(vm, Str{strings.Join(ls, tostring(j))})
+			return join(vm, Str(strings.Join(ls, tostring(j))))
 		}),
-		Str{"sort"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("sort"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			f := aa.get(1).(Func)
 			vm.da(aa)
@@ -1007,19 +1005,19 @@ func init() {
 	})
 	protoList.meta = protoDef
 	protoChan = NewMap(MapData{
-		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("read"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			return join(vm, <-c.c)
 		}),
-		Str{"write"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("write"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			a := aa.get(1)
 			vm.da(aa)
 			c.c <- a
 			return join(vm, Bool(true))
 		}),
-		Str{"close"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("close"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			close(c.c)
@@ -1028,7 +1026,7 @@ func init() {
 	})
 	protoChan.meta = protoDef
 	protoGroup = NewMap(MapData{
-		Str{"run"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("run"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			f := aa.get(1).(Func)
 			ab := vm.ga(aa.len() - 2)
@@ -1039,7 +1037,7 @@ func init() {
 			vm.da(aa)
 			return join(vm, Bool(true))
 		}),
-		Str{"wait"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("wait"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			vm.da(aa)
 			g.Wait()
@@ -1048,25 +1046,25 @@ func init() {
 	})
 	protoGroup.meta = protoDef
 	protoStr = NewMap(MapData{
-		Str{"split"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("split"): Func(func(vm *VM, aa *Args) *Args {
 			s := tostring(aa.get(0))
 			j := tostring(aa.get(1))
 			vm.da(aa)
 			l := []Any{}
 			for _, p := range strings.Split(s, j) {
-				l = append(l, Str{p})
+				l = append(l, Str(p))
 			}
 			return join(vm, NewList(l))
 		}),
 	})
 	protoStr.meta = protoDef
 	protoTick = NewMap(MapData{
-		Str{"read"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("read"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Read())
 		}),
-		Str{"stop"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("stop"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Stop())
@@ -1078,8 +1076,8 @@ func init() {
 	protoInst.meta = protoDef
 
 	libTime = NewMap(MapData{
-		Str{"ms"}: Int(int64(time.Millisecond)),
-		Str{"ticker"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("ms"): Int(int64(time.Millisecond)),
+		Str("ticker"): Func(func(vm *VM, aa *Args) *Args {
 			d := int64(aa.get(0).(Int))
 			vm.da(aa)
 			return join(vm, NewTicker(time.Duration(d)))
@@ -1088,11 +1086,11 @@ func init() {
 	Ntime = libTime
 
 	libSync = NewMap(MapData{
-		Str{"group"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("group"): Func(func(vm *VM, aa *Args) *Args {
 			vm.da(aa)
 			return join(vm, NewGroup())
 		}),
-		Str{"channel"}: Func(func(vm *VM, aa *Args) *Args {
+		Str("channel"): Func(func(vm *VM, aa *Args) *Args {
 			n := int(aa.get(0).(IntIsh).Int())
 			vm.da(aa)
 			return join(vm, NewChan(n))
