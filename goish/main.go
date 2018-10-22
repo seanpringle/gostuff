@@ -768,6 +768,12 @@ func (p *Parser) run() (wtf error) {
 		p.println(string(data))
 	}
 
+	block := p.block(nil, Scope{}, nil).Format()
+
+	for k, n := range Keys {
+		p.println(fmt.Sprintf(`var S%d Str = Str{%q}`, n, k))
+	}
+
 	p.println(`func main() {`)
 
 	p.println(`
@@ -785,8 +791,7 @@ func (p *Parser) run() (wtf error) {
 
 	`)
 
-	block := p.block(nil, Scope{}, nil)
-	p.println(block.Format())
+	p.println(block)
 	p.println(`}`)
 	return
 }

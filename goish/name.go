@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+var KId int = 1
+var Keys map[string]int = map[string]int{}
+
 type NodeName struct {
 	name string
 }
@@ -31,5 +34,10 @@ func (nn *NodeName) Produces() int {
 }
 
 func (nn *NodeName) FormatKey() string {
-	return fmt.Sprintf(`Str{%q}`, nn.name)
+	//return fmt.Sprintf(`Str{%q}`, nn.name)
+	if _, ok := Keys[nn.name]; !ok {
+		Keys[nn.name] = KId
+		KId++
+	}
+	return fmt.Sprintf(`S%d /* %s */`, Keys[nn.name], nn.name)
 }
