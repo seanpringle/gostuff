@@ -17,7 +17,7 @@ func NewNodeWhile(flag, body Node) *NodeWhile {
 }
 
 func (nf *NodeWhile) Format() string {
-	return fmt.Sprintf("loop(func() { for truth(%s) { vm.da(call(vm, %s, nil)) } })", nf.flag.Format(), nf.body.Format())
+	return fmt.Sprintf("loop(func() { for (%s) { vm.da(call(vm, %s, nil)) } })", FormatBool(nf.flag), nf.body.Format())
 }
 
 func (nf *NodeWhile) String() string {

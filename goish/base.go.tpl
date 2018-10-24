@@ -9,7 +9,11 @@ import "time"
 import "log"
 import "os"
 import "sort"
+import "io"
+import "io/ioutil"
 import "runtime/pprof"
+import "encoding/hex"
+import "bufio"
 
 type Any interface {
 	Type() string
@@ -102,7 +106,10 @@ var protoChan *Map
 var protoGroup *Map
 var protoInst *Map
 var protoTick *Map
+var protoByte *Map
+var protoStream *Map
 
+var libIO *Map
 var libTime *Map
 var libSync *Map
 
@@ -114,6 +121,10 @@ type BoolIsh interface {
 
 type StrIsh interface {
 	Str() Str
+}
+
+type ByteIsh interface {
+	Byte() Byte
 }
 
 type IntIsh interface {
@@ -163,8 +174,12 @@ func (s Str) Type() string {
 	return "string"
 }
 
-func (s Str) Len() int64 {
-	return int64(len(s))
+func (s Str) Len() int64 { // characters
+	l := int64(0)
+	for range string(s) {
+		l++
+	}
+	return l
 }
 
 func (s Str) Lib() *Map {
@@ -173,6 +188,32 @@ func (s Str) Lib() *Map {
 
 func (s Str) Bool() Bool {
 	return Bool(len(s) > 0)
+}
+
+func (s Str) Byte() Byte {
+	return []byte(string(s))
+}
+
+type Byte []byte
+
+func (b Byte) Type() string {
+	return "bytes"
+}
+
+func (b Byte) Lib() *Map {
+	return protoByte
+}
+
+func (b Byte) String() string {
+	return hex.Dump([]byte(b))
+}
+
+func (b Byte) Str() Str {
+	return Str(string(b))
+}
+
+func (b Byte) Len() int64 {
+	return int64(len(b))
 }
 
 type Int int64
@@ -561,6 +602,34 @@ func (g *Group) Wait() {
 	g.g = sync.WaitGroup{}
 }
 
+type Stream struct {
+	s interface{}
+}
+
+func NewStream(s interface{}) Stream {
+	r, reader := s.(io.Reader)
+	w, writer := s.(io.Writer)
+	if reader && writer {
+		return Stream{bufio.NewReadWriter(bufio.NewReader(r), bufio.NewWriter(w))}
+	}
+	if writer {
+		return Stream{bufio.NewWriter(w)}
+	}
+	return Stream{bufio.NewReader(r)}
+}
+
+func (s Stream) Type() string {
+	return "stream"
+}
+
+func (s Stream) Lib() *Map {
+	return protoStream
+}
+
+func (s Stream) String() string {
+	return "stream"
+}
+
 func isInt(a Any) (n Int, b bool) {
 	if ai, is := a.(Int); is {
 		return ai, true
@@ -883,15 +952,23 @@ func length(v Any) Any {
 func noop(a Any) {
 }
 
+func ifnil(a, b Any) Any {
+	if a == nil {
+		return b
+	}
+	return a
+}
+
 var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
 	parts := []string{}
 	for i := 0; i < aa.len(); i++ {
 		parts = append(parts, tostring(aa.get(i)))
 	}
-	fmt.Printf("%s\n", strings.Join(parts, " "))
+	fmt.Printf("%s\n", strings.Join(parts, "\t"))
 	return aa
 })
 
+var Nio *Map
 var Ntime *Map
 var Nsync *Map
 
@@ -1046,6 +1123,11 @@ func init() {
 	})
 	protoGroup.meta = protoDef
 	protoStr = NewMap(MapData{
+		Str("bytes"): Func(func(vm *VM, aa *Args) *Args {
+			s := tostring(aa.get(0))
+			vm.da(aa)
+			return join(vm, Byte(s))
+		}),
 		Str("split"): Func(func(vm *VM, aa *Args) *Args {
 			s := tostring(aa.get(0))
 			j := tostring(aa.get(1))
@@ -1072,8 +1154,7 @@ func init() {
 	})
 	protoTick.meta = protoDef
 
-	protoInst = NewMap(MapData{})
-	protoInst.meta = protoDef
+	protoInst = protoDef
 
 	libTime = NewMap(MapData{
 		Str("ms"): Int(int64(time.Millisecond)),
@@ -1097,4 +1178,148 @@ func init() {
 		}),
 	})
 	Nsync = libSync
+
+	libIO = NewMap(MapData{
+		Str("stdin"):  NewStream(os.Stdin),
+		Str("stdout"): NewStream(os.Stdout),
+		Str("stderr"): NewStream(os.Stderr),
+
+		Str("open"): Func(func(vm *VM, aa *Args) *Args {
+			path := aa.get(0).String()
+			modes := aa.get(1).String()
+			mode := os.O_RDONLY
+			switch modes {
+			case "r":
+				mode = os.O_RDONLY
+			case "w":
+				mode = os.O_WRONLY
+			case "a":
+				mode = os.O_APPEND
+			case "r+":
+				mode = os.O_RDWR
+			case "w+":
+				mode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+			case "a+":
+				mode = os.O_RDONLY | os.O_CREATE | os.O_APPEND
+			default:
+				panic(fmt.Sprintf("unknown file acces mode: %s", modes))
+			}
+			file, err := os.OpenFile(path, mode, 0644)
+			if err != nil {
+				return join(vm, Bool(false), Str(err.Error()))
+			}
+			return join(vm, Bool(true), NewStream(file))
+		}),
+	})
+	Nio = libIO
+
+	protoByte = protoDef
+
+	protoStream = NewMap(MapData{
+
+		Str("read"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			limit := ifnil(aa.get(1), Int(1024*1024)).(IntIsh).Int()
+			vm.da(aa)
+			if _, is := stream.s.(io.Reader); !is {
+				return join(vm, Bool(false), Int(0), Str("not a reader"))
+			}
+			buff := make([]byte, int(limit))
+			length, err := stream.s.(io.Reader).Read(buff)
+			if err != nil && err != io.EOF {
+				return join(vm, Bool(false), Byte(buff[:length]), Str(err.Error()))
+			}
+			return join(vm, Bool(true), Byte(buff[:length]))
+		}),
+
+		Str("readall"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			vm.da(aa)
+			if _, is := stream.s.(io.Reader); !is {
+				return join(vm, Bool(false), Int(0), Str("not a reader"))
+			}
+			buff, err := ioutil.ReadAll(stream.s.(io.Reader))
+			if err != nil {
+				return join(vm, Bool(false), Byte(buff), Str(err.Error()))
+			}
+			return join(vm, Bool(true), Byte(buff))
+		}),
+
+		Str("readrune"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			vm.da(aa)
+			if _, is := stream.s.(io.Reader); !is {
+				return join(vm, Bool(false), Int(0), Str("not a reader"))
+			}
+			_, rw := stream.s.(*bufio.ReadWriter)
+			var char rune
+			var err error
+			if rw {
+				char, _, err = stream.s.(*bufio.ReadWriter).ReadRune()
+			} else {
+				char, _, err = stream.s.(*bufio.Reader).ReadRune()
+			}
+			if char != rune(0) {
+				return join(vm, Bool(true), Rune(char))
+			}
+			if err == io.EOF {
+				return join(vm, Bool(true), nil)
+			}
+			if err != nil {
+				return join(vm, Bool(false), Str(err.Error()))
+			}
+			panic("readrune unknown state")
+		}),
+
+		Str("readline"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			vm.da(aa)
+			if _, is := stream.s.(io.Reader); !is {
+				return join(vm, Bool(false), Int(0), Str("not a reader"))
+			}
+			_, rw := stream.s.(*bufio.ReadWriter)
+			var line string
+			var err error
+			if rw {
+				line, err = stream.s.(*bufio.ReadWriter).ReadString('\n')
+			} else {
+				line, err = stream.s.(*bufio.Reader).ReadString('\n')
+			}
+			if err == io.EOF && len(line) > 0 {
+				return join(vm, Bool(true), Str(line))
+			}
+			if err == io.EOF && len(line) == 0 {
+				return join(vm, Bool(true), nil)
+			}
+			if err != nil {
+				return join(vm, Bool(false), Str(err.Error()))
+			}
+			return join(vm, Bool(true), Str(line))
+		}),
+
+		Str("write"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			data := aa.get(1).(ByteIsh).Byte()
+			vm.da(aa)
+			if _, is := stream.s.(io.Writer); !is {
+				return join(vm, Bool(false), Int(0), Str("not a writer"))
+			}
+			if length, err := stream.s.(io.Writer).Write([]byte(data)); err != nil {
+				return join(vm, Bool(false), Int(length), Str(err.Error()))
+			}
+			return join(vm, Bool(true))
+		}),
+
+		Str("close"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			vm.da(aa)
+			if r, is := stream.s.(io.Closer); is {
+				if err := r.Close(); err != nil {
+					return join(vm, Bool(false), Str(err.Error()))
+				}
+			}
+			return join(vm, Bool(true))
+		}),
+	})
+	protoStream.meta = protoDef
 }

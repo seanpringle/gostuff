@@ -93,7 +93,7 @@ func FormatBool(n Node) string {
 	if f, is := n.(CanFormatBool); is {
 		return f.FormatBool()
 	}
-	return fmt.Sprintf("truth(%s)", n.Format())
+	return fmt.Sprintf("truth(%s)", FormatOne(n))
 }
 
 type Nodes []Node

@@ -1,8 +1,10 @@
 super   = getprototype(nil)
 integer = getprototype(0)
 decimal = getprototype(0)
+string  = getprototype("")
 list    = getprototype([])
 map     = getprototype({})
+stream  = getprototype(io.stdin)
 true    = 0 < 1
 false   = 1 < 0
 nil     = []:pop()
@@ -165,6 +167,22 @@ function()
 			},
 			protoQueue,
 		)
+	end
+
+end()
+
+
+function()
+	p = stream
+
+	p.iterate = function(s)
+		done = false
+		return do
+			if ok, line = s:readline() then
+				return line
+			end
+			return nil
+		end
 	end
 
 end()
