@@ -289,6 +289,17 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeField()
 	}
 
+	if p.scan() == '!' || p.peek("not") {
+		if p.scan() == '!' {
+			p.take()
+		} else {
+			p.take()
+			p.take()
+			p.take()
+		}
+		return NewNodeNot(p.node(block))
+	}
+
 	if p.scan() == '=' && p.char(1) == '=' {
 		p.take()
 		p.take()
@@ -523,6 +534,20 @@ func (p *Parser) node(block *NodeBlock) Node {
 		ensure(p.next() == '"', "expected closing quotes")
 		str = append(str, p.take())
 		return NewNodeLitStr(string(str))
+	}
+
+	if p.scan() == '\'' {
+		str = append(str, p.take())
+		for p.next() != '\'' {
+			c := p.take()
+			str = append(str, c)
+			if c == '\\' {
+				str = append(str, p.take())
+			}
+		}
+		ensure(p.next() == '\'', "expected closing quotes")
+		str = append(str, p.take())
+		return NewNodeLitRune(string(str))
 	}
 
 	if p.isname(p.scan()) {

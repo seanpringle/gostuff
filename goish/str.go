@@ -18,6 +18,10 @@ func (ls *NodeLitStr) Format() string {
 	return fmt.Sprintf(`Str(%s)`, ls.value)
 }
 
+func (ls *NodeLitStr) FormatOne() string {
+	return ls.Format()
+}
+
 func (ls *NodeLitStr) String() string {
 	return fmt.Sprintf("NodeLitStr{%s}", ls.Format())
 }

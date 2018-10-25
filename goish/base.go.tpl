@@ -14,6 +14,7 @@ import "io/ioutil"
 import "runtime/pprof"
 import "encoding/hex"
 import "bufio"
+import "errors"
 
 type Any interface {
 	Type() string
@@ -316,7 +317,38 @@ func (r Rune) String() string {
 	return string([]rune{rune(r)})
 }
 
+func (r Rune) Str() Str {
+	return Str(r.String())
+}
+
 func (r Rune) Lib() *Map {
+	return protoDef
+}
+
+type Status struct {
+	e error
+}
+
+func NewStatus(e error) Status {
+	return Status{e: e}
+}
+
+func (e Status) Bool() Bool {
+	return Bool(e.e == nil)
+}
+
+func (e Status) Type() string {
+	return "status"
+}
+
+func (e Status) String() string {
+	if e.e != nil {
+		return error(e.e).Error()
+	}
+	return "ok"
+}
+
+func (e Status) Lib() *Map {
 	return protoDef
 }
 
@@ -425,8 +457,8 @@ func (t *Map) Find(key Any) Any {
 					}
 				}
 			}
-			if t, is := t.meta.(*Map); is {
-				return t.Find(key)
+			if mt, is := t.meta.(*Map); is {
+				return mt.Find(key)
 			}
 			return t.meta
 		}
@@ -456,7 +488,7 @@ func (t *Map) String() string {
 				v = Str("slice")
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
-			pairs = append(pairs, fmt.Sprintf("%s = %s", k.String(), v.String()))
+			pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 		}
 		return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
 	}
@@ -663,8 +695,8 @@ func add(a, b Any) Any {
 			return Dec(float64(ad.Dec()) + float64(bd.Dec()))
 		}
 	}
-	if as, is := a.(StrIsh); is {
-		return Str(as.Str().String() + tostring(b))
+	if _, is := a.(StrIsh); is {
+		return Str(tostring(a) + tostring(b))
 	}
 	panic(fmt.Errorf("invalid addition: %v %v", a, b))
 }
@@ -812,6 +844,9 @@ func truth(a interface{}) bool {
 		if ab, is := a.(BoolIsh); is {
 			return bool(ab.Bool())
 		}
+		if aa, is := a.(Any); is {
+			return tobool(aa)
+		}
 	}
 	return false
 }
@@ -867,6 +902,8 @@ func call(vm *VM, f Any, aa *Args) *Args {
 func find(t Any, key Any) Any {
 	if t != nil {
 		return t.Lib().Find(key)
+	} else {
+		return protoDef.Find(key)
 	}
 	return nil
 }
@@ -932,14 +969,21 @@ func loop(fn func()) {
 func trymethod(t Any, k string, def Any) Any {
 	t, m := method(t, Str(k))
 	if m != nil {
-		vm := &VM{}
-		return call(vm, m, join(vm, t)).get(0)
+		if _, is := m.(Func); is {
+			vm := &VM{}
+			return call(vm, m, join(vm, t)).get(0)
+		}
+		return m
 	}
 	return def
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", Str("nil")).(Str).String()
+	return trymethod(s, "string", Str("nil")).(StrIsh).Str().String()
+}
+
+func tobool(s Any) bool {
+	return bool(trymethod(s, "bool", Bool(false)).(BoolIsh).Bool())
 }
 
 func length(v Any) Any {
@@ -1003,10 +1047,30 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	return join(vm, v.Lib())
 })
 
+type ReadRuner interface {
+	ReadRune() (rune, int, error)
+}
+
+type Flusher interface {
+	Flush() error
+}
+
 func init() {
 	protoDef = NewMap(MapData{
 		Str("string"): Func(func(vm *VM, aa *Args) *Args {
-			return join(vm, Str(aa.get(0).String()))
+			a := aa.get(0)
+			if a == nil {
+				return join(vm, Str("(nil)"))
+			}
+			return join(vm, Str(a.String()))
+		}),
+		Str("status"): Func(func(vm *VM, aa *Args) *Args {
+			a := aa.get(0)
+			vm.da(aa)
+			if a == nil {
+				return join(vm, NewStatus(nil))
+			}
+			return join(vm, NewStatus(errors.New(tostring(a))))
 		}),
 	})
 	protoInt = NewMap(MapData{})
@@ -1062,7 +1126,7 @@ func init() {
 		}),
 		Str("join"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
-			j := aa.get(1)
+			j := ifnil(aa.get(1), Str(""))
 			vm.da(aa)
 			var ls []string
 			for _, s := range l.data {
@@ -1092,7 +1156,7 @@ func init() {
 			a := aa.get(1)
 			vm.da(aa)
 			c.c <- a
-			return join(vm, Bool(true))
+			return join(vm, NewStatus(nil))
 		}),
 		Str("close"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
@@ -1112,13 +1176,13 @@ func init() {
 			}
 			g.Run(f, ab)
 			vm.da(aa)
-			return join(vm, Bool(true))
+			return join(vm, NewStatus(nil))
 		}),
 		Str("wait"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			vm.da(aa)
 			g.Wait()
-			return join(vm, Bool(true))
+			return join(vm, NewStatus(nil))
 		}),
 	})
 	protoGroup.meta = protoDef
@@ -1185,8 +1249,8 @@ func init() {
 		Str("stderr"): NewStream(os.Stderr),
 
 		Str("open"): Func(func(vm *VM, aa *Args) *Args {
-			path := aa.get(0).String()
-			modes := aa.get(1).String()
+			path := tostring(aa.get(0))
+			modes := tostring(aa.get(1))
 			mode := os.O_RDONLY
 			switch modes {
 			case "r":
@@ -1206,9 +1270,9 @@ func init() {
 			}
 			file, err := os.OpenFile(path, mode, 0644)
 			if err != nil {
-				return join(vm, Bool(false), Str(err.Error()))
+				return join(vm, NewStatus(err))
 			}
-			return join(vm, Bool(true), NewStream(file))
+			return join(vm, NewStatus(nil), NewStream(file))
 		}),
 	})
 	Nio = libIO
@@ -1222,79 +1286,31 @@ func init() {
 			limit := ifnil(aa.get(1), Int(1024*1024)).(IntIsh).Int()
 			vm.da(aa)
 			if _, is := stream.s.(io.Reader); !is {
-				return join(vm, Bool(false), Int(0), Str("not a reader"))
+				return join(vm, NewStatus(errors.New("not a reader")))
 			}
 			buff := make([]byte, int(limit))
 			length, err := stream.s.(io.Reader).Read(buff)
-			if err != nil && err != io.EOF {
-				return join(vm, Bool(false), Byte(buff[:length]), Str(err.Error()))
-			}
-			return join(vm, Bool(true), Byte(buff[:length]))
+			return join(vm, NewStatus(err), Byte(buff[:length]))
 		}),
 
 		Str("readall"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
 			if _, is := stream.s.(io.Reader); !is {
-				return join(vm, Bool(false), Int(0), Str("not a reader"))
+				return join(vm, NewStatus(errors.New("not a reader")))
 			}
 			buff, err := ioutil.ReadAll(stream.s.(io.Reader))
-			if err != nil {
-				return join(vm, Bool(false), Byte(buff), Str(err.Error()))
-			}
-			return join(vm, Bool(true), Byte(buff))
+			return join(vm, NewStatus(err), Byte(buff))
 		}),
 
 		Str("readrune"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
-			if _, is := stream.s.(io.Reader); !is {
-				return join(vm, Bool(false), Int(0), Str("not a reader"))
+			if r, is := stream.s.(ReadRuner); is {
+				char, _, err := r.ReadRune()
+				return join(vm, NewStatus(err), Rune(char))
 			}
-			_, rw := stream.s.(*bufio.ReadWriter)
-			var char rune
-			var err error
-			if rw {
-				char, _, err = stream.s.(*bufio.ReadWriter).ReadRune()
-			} else {
-				char, _, err = stream.s.(*bufio.Reader).ReadRune()
-			}
-			if char != rune(0) {
-				return join(vm, Bool(true), Rune(char))
-			}
-			if err == io.EOF {
-				return join(vm, Bool(true), nil)
-			}
-			if err != nil {
-				return join(vm, Bool(false), Str(err.Error()))
-			}
-			panic("readrune unknown state")
-		}),
-
-		Str("readline"): Func(func(vm *VM, aa *Args) *Args {
-			stream := aa.get(0).(Stream)
-			vm.da(aa)
-			if _, is := stream.s.(io.Reader); !is {
-				return join(vm, Bool(false), Int(0), Str("not a reader"))
-			}
-			_, rw := stream.s.(*bufio.ReadWriter)
-			var line string
-			var err error
-			if rw {
-				line, err = stream.s.(*bufio.ReadWriter).ReadString('\n')
-			} else {
-				line, err = stream.s.(*bufio.Reader).ReadString('\n')
-			}
-			if err == io.EOF && len(line) > 0 {
-				return join(vm, Bool(true), Str(line))
-			}
-			if err == io.EOF && len(line) == 0 {
-				return join(vm, Bool(true), nil)
-			}
-			if err != nil {
-				return join(vm, Bool(false), Str(err.Error()))
-			}
-			return join(vm, Bool(true), Str(line))
+			return join(vm, NewStatus(errors.New("not a reader")))
 		}),
 
 		Str("write"): Func(func(vm *VM, aa *Args) *Args {
@@ -1302,23 +1318,28 @@ func init() {
 			data := aa.get(1).(ByteIsh).Byte()
 			vm.da(aa)
 			if _, is := stream.s.(io.Writer); !is {
-				return join(vm, Bool(false), Int(0), Str("not a writer"))
+				return join(vm, NewStatus(errors.New("not a writer")))
 			}
-			if length, err := stream.s.(io.Writer).Write([]byte(data)); err != nil {
-				return join(vm, Bool(false), Int(length), Str(err.Error()))
+			length, err := stream.s.(io.Writer).Write([]byte(data))
+			return join(vm, NewStatus(err), Int(length))
+		}),
+
+		Str("flush"): Func(func(vm *VM, aa *Args) *Args {
+			stream := aa.get(0).(Stream)
+			vm.da(aa)
+			if w, is := stream.s.(Flusher); !is {
+				return join(vm, NewStatus(w.Flush()))
 			}
-			return join(vm, Bool(true))
+			return join(vm, NewStatus(errors.New("not a flusher")))
 		}),
 
 		Str("close"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
-			if r, is := stream.s.(io.Closer); is {
-				if err := r.Close(); err != nil {
-					return join(vm, Bool(false), Str(err.Error()))
-				}
+			if c, is := stream.s.(io.Closer); is {
+				return join(vm, NewStatus(c.Close()))
 			}
-			return join(vm, Bool(true))
+			return join(vm, NewStatus(nil))
 		}),
 	})
 	protoStream.meta = protoDef

@@ -25,15 +25,15 @@ func (no *NodeFind) Produces() int {
 }
 
 func (no *NodeFind) Precedence() int {
-	return 8
+	return 7
 }
 
 func (no *NodeFind) Format() string {
-	return fmt.Sprintf("find(%s,%s)", no.args[1].Format(), no.args[0].(Keyer).FormatKey())
+	return fmt.Sprintf("find(%s,%s)", FormatOne(no.args[1]), no.args[0].(Keyer).FormatKey())
 }
 
 func (no *NodeFind) FormatStore(val string) string {
-	return fmt.Sprintf("store(%s,%s,%s)", no.args[1].Format(), no.args[0].(Keyer).FormatKey(), val)
+	return fmt.Sprintf("store(%s,%s,%s)", FormatOne(no.args[1]), no.args[0].(Keyer).FormatKey(), val)
 }
 
 func (no *NodeFind) String() string {

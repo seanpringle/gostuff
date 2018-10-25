@@ -147,7 +147,3 @@ print("length", #l, #m)
 print(0:max(2))
 
 print([2,4,6,8,3]:sort(do(a, b) return a < b end))
-
-for io.stdin do(line)
-	print("line", line)
-end

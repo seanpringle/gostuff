@@ -171,14 +171,25 @@ function()
 
 end()
 
-
 function()
 	p = stream
+
+	p.readline = function(s)
+		line = []
+		while ok, c = s:readrune() do
+			line:push(c)
+			if not c or c == '\n' then
+				break
+			end
+		end
+		return #line > 0, line:join()
+	end
 
 	p.iterate = function(s)
 		done = false
 		return do
 			if ok, line = s:readline() then
+				print(ok)
 				return line
 			end
 			return nil

@@ -1,6 +1,9 @@
 all:
 	go build && cat lib.goi test2.goi | ./goish | gofmt > test/main.go && cd test && go run main.go
 
+bug:
+	go build && cat test.goi | ./goish | gofmt > test/main.go && cd test && go run main.go
+
 fib:
 	cat lib.goi fib.goi | ./goish | gofmt > test/main.go
 
