@@ -812,6 +812,10 @@ func (p *Parser) run() (wtf error) {
 		}
 		defer pprof.StopCPUProfile()
 
+		for _, f := range onInit {
+			f()
+		}
+
 		vm := &VM{}
 
 	`)

@@ -114,6 +114,8 @@ var libIO *Map
 var libTime *Map
 var libSync *Map
 
+var onInit []func()
+
 type Stringer = fmt.Stringer
 
 type BoolIsh interface {
@@ -215,6 +217,10 @@ func (b Byte) Str() Str {
 
 func (b Byte) Len() int64 {
 	return int64(len(b))
+}
+
+func (b Byte) Bool() Bool {
+	return Bool(len(b) > 0)
 }
 
 type Int int64
@@ -662,6 +668,20 @@ func (s Stream) String() string {
 	return "stream"
 }
 
+func (s Stream) Flush() error {
+	if f, is := s.s.(Flusher); is {
+		return f.Flush()
+	}
+	return errors.New("not a flusher")
+}
+
+func (s Stream) Close() error {
+	if c, is := s.s.(Closer); is {
+		return c.Close()
+	}
+	return errors.New("not a closer")
+}
+
 func isInt(a Any) (n Int, b bool) {
 	if ai, is := a.(Int); is {
 		return ai, true
@@ -979,7 +999,7 @@ func trymethod(t Any, k string, def Any) Any {
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", Str("nil")).(StrIsh).Str().String()
+	return trymethod(s, "string", Str("(nil)")).(StrIsh).Str().String()
 }
 
 func tobool(s Any) bool {
@@ -1025,6 +1045,15 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	return join(vm, Str("nil"))
 })
 
+var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
+	msg := aa.get(0)
+	vm.da(aa)
+	if msg != nil {
+		return join(vm, NewStatus(errors.New(tostring(msg))))
+	}
+	return join(vm, NewStatus(nil))
+})
+
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	if m, is := aa.get(0).(*Map); is {
 		m.meta = aa.get(1)
@@ -1055,10 +1084,15 @@ type Flusher interface {
 	Flush() error
 }
 
+type Closer interface {
+	Close() error
+}
+
 func init() {
 	protoDef = NewMap(MapData{
 		Str("string"): Func(func(vm *VM, aa *Args) *Args {
 			a := aa.get(0)
+			vm.da(aa)
 			if a == nil {
 				return join(vm, Str("(nil)"))
 			}
@@ -1327,19 +1361,13 @@ func init() {
 		Str("flush"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
-			if w, is := stream.s.(Flusher); !is {
-				return join(vm, NewStatus(w.Flush()))
-			}
-			return join(vm, NewStatus(errors.New("not a flusher")))
+			return join(vm, NewStatus(stream.Flush()))
 		}),
 
 		Str("close"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
-			if c, is := stream.s.(io.Closer); is {
-				return join(vm, NewStatus(c.Close()))
-			}
-			return join(vm, NewStatus(nil))
+			return join(vm, NewStatus(stream.Close()))
 		}),
 	})
 	protoStream.meta = protoDef

@@ -189,11 +189,26 @@ function()
 		done = false
 		return do
 			if ok, line = s:readline() then
-				print(ok)
 				return line
 			end
 			return nil
 		end
+	end
+
+end()
+
+
+function()
+	p = io
+
+	p.slurp = function(path)
+		if ok, file = io.open(path, "r") then
+			if ok, content = file:readall() then
+				file:close()
+				return content
+			end
+		end
+		return nil
 	end
 
 end()
