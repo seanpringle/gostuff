@@ -274,6 +274,12 @@ func (p *Parser) node(block *NodeBlock) Node {
 
 	str := []rune{}
 
+	if p.scan() == '.' && p.char(1) == '.' {
+		p.take()
+		p.take()
+		return NewNodeConcat()
+	}
+
 	if p.scan() == '.' {
 		p.take()
 		return NewNodeFind()
@@ -796,7 +802,7 @@ func (p *Parser) run() (wtf error) {
 	block := p.block(nil, Scope{}, nil).Format()
 
 	for k, n := range Keys {
-		p.println(fmt.Sprintf(`const S%d Str = Str(%q)`, n, k))
+		p.println(fmt.Sprintf(`const S%d Text = Text(%q)`, n, k))
 	}
 
 	p.println(`func main() {`)

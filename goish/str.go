@@ -15,7 +15,7 @@ func NewNodeLitStr(value string) *NodeLitStr {
 }
 
 func (ls *NodeLitStr) Format() string {
-	return fmt.Sprintf(`Str(%s)`, ls.value)
+	return fmt.Sprintf(`Text(%s)`, ls.value)
 }
 
 func (ls *NodeLitStr) FormatOne() string {
@@ -31,5 +31,5 @@ func (ls *NodeLitStr) Produces() int {
 }
 
 func (ls *NodeLitStr) FormatKey() string {
-	return fmt.Sprintf("Str(%s)", ls.value)
+	return fmt.Sprintf("Text(%s)", ls.value)
 }

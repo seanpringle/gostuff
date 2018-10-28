@@ -1,6 +1,6 @@
 
 http.serve(":3000", {
 	"/" = function(req)
-		req:write(io.slurp("index.html"):string())
+		req:write("<b>hello</b> world":escape())
 	end,
 })

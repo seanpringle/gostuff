@@ -1,15 +1,18 @@
 package main
 
 import "net/http"
+import "fmt"
 import "github.com/gorilla/websocket"
+import "golang.org/x/net/html"
 
 var libHttp *Map
 var protoHttpReq *Map
 var protoWebSock *Map
 
 type HttpReq struct {
-	r *http.Request
-	w http.ResponseWriter
+	r    *http.Request
+	w    http.ResponseWriter
+	vals *Map
 }
 
 func (r HttpReq) Type() string {
@@ -46,14 +49,15 @@ func init() {
 	onInit = append(onInit, func() {
 
 		libHttp = NewMap(MapData{
-			Str("serve"): Func(func(vm *VM, aa *Args) *Args {
-				addr := tostring(aa.get(0))
+			Text("serve"): Func(func(vm *VM, aa *Args) *Args {
+				addr := totext(aa.get(0))
 				routes := aa.get(1).(*Map)
 				vm.da(aa)
 				for pattern, handler := range routes.data {
-					http.HandleFunc(tostring(pattern), func(w http.ResponseWriter, r *http.Request) {
+					http.HandleFunc(totext(pattern), func(w http.ResponseWriter, r *http.Request) {
+						r.ParseForm()
 						vm := &VM{}
-						call(vm, handler, join(vm, HttpReq{r, w}))
+						call(vm, handler, join(vm, HttpReq{r: r, w: w}))
 					})
 				}
 				return join(vm, NewStatus(http.ListenAndServe(addr, nil)))
@@ -61,17 +65,33 @@ func init() {
 		})
 		Nhttp = libHttp
 
+		protoText.Set(Text("escape"), Func(func(vm *VM, aa *Args) *Args {
+			str := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(html.EscapeString(str)))
+		}))
+
 		protoHttpReq = NewMap(MapData{
 
-			Str("write"): Func(func(vm *VM, aa *Args) *Args {
+			Text("get"): Func(func(vm *VM, aa *Args) *Args {
 				req := aa.get(0).(HttpReq)
-				data := tostring(aa.get(1))
+				key := totext(aa.get(1))
+				vm.da(aa)
+				if v, ok := req.r.Form[key]; ok {
+					return join(vm, NewStatus(nil), Blob(v[0]))
+				}
+				return join(vm, NewStatus(fmt.Errorf("key not found: %s", key)))
+			}),
+
+			Text("write"): Func(func(vm *VM, aa *Args) *Args {
+				req := aa.get(0).(HttpReq)
+				data := totext(aa.get(1))
 				vm.da(aa)
 				length, err := req.w.Write([]byte(data))
 				return join(vm, NewStatus(err), Int(length))
 			}),
 
-			Str("websocket"): Func(func(vm *VM, aa *Args) *Args {
+			Text("websocket"): Func(func(vm *VM, aa *Args) *Args {
 				req := aa.get(0).(HttpReq)
 				var wsUpgrader = websocket.Upgrader{
 					ReadBufferSize:  1024,
@@ -88,26 +108,26 @@ func init() {
 
 		protoWebSock = NewMap(MapData{
 
-			Str("text"):   Int(websocket.TextMessage),
-			Str("binary"): Int(websocket.BinaryMessage),
+			Text("text"):   Int(websocket.TextMessage),
+			Text("binary"): Int(websocket.BinaryMessage),
 
-			Str("read"): Func(func(vm *VM, aa *Args) *Args {
+			Text("read"): Func(func(vm *VM, aa *Args) *Args {
 				ws := aa.get(0).(WebSock)
 				vm.da(aa)
 				mt, payload, err := ws.c.ReadMessage()
-				return join(vm, NewStatus(err), Int(mt), Byte(payload))
+				return join(vm, NewStatus(err), Int(mt), Blob(payload))
 			}),
 
-			Str("write"): Func(func(vm *VM, aa *Args) *Args {
+			Text("write"): Func(func(vm *VM, aa *Args) *Args {
 				ws := aa.get(0).(WebSock)
 				mt := aa.get(1).(IntIsh).Int()
-				data := aa.get(2).(ByteIsh).Byte()
+				data := aa.get(2).(BlobIsh).Blob()
 				vm.da(aa)
 				err := ws.c.WriteMessage(int(mt), []byte(data))
 				return join(vm, NewStatus(err))
 			}),
 
-			Str("close"): Func(func(vm *VM, aa *Args) *Args {
+			Text("close"): Func(func(vm *VM, aa *Args) *Args {
 				ws := aa.get(0).(WebSock)
 				vm.da(aa)
 				err := ws.c.Close()

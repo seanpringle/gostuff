@@ -66,7 +66,7 @@ print(l)
 print(l:pop())
 print(l)
 
-print("a" + "b")
+print("a" .. "b")
 
 len = "hi"
 print("yo", l:len())

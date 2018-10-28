@@ -102,12 +102,12 @@ var protoInt *Map
 var protoDec *Map
 var protoMap *Map
 var protoList *Map
-var protoStr *Map
+var protoText *Map
 var protoChan *Map
 var protoGroup *Map
 var protoInst *Map
 var protoTick *Map
-var protoByte *Map
+var protoBlob *Map
 var protoStream *Map
 
 var libIO *Map
@@ -122,12 +122,12 @@ type BoolIsh interface {
 	Bool() Bool
 }
 
-type StrIsh interface {
-	Str() Str
+type TextIsh interface {
+	Text() Text
 }
 
-type ByteIsh interface {
-	Byte() Byte
+type BlobIsh interface {
+	Blob() Blob
 }
 
 type IntIsh interface {
@@ -163,21 +163,21 @@ func (b Bool) Lib() *Map {
 	return protoDef
 }
 
-type Str string
+type Text string
 
-func (s Str) Str() Str {
+func (s Text) Text() Text {
 	return s
 }
 
-func (s Str) String() string {
+func (s Text) String() string {
 	return string(s)
 }
 
-func (s Str) Type() string {
-	return "string"
+func (s Text) Type() string {
+	return "text"
 }
 
-func (s Str) Len() int64 { // characters
+func (s Text) Len() int64 { // characters
 	l := int64(0)
 	for range string(s) {
 		l++
@@ -185,41 +185,45 @@ func (s Str) Len() int64 { // characters
 	return l
 }
 
-func (s Str) Lib() *Map {
-	return protoStr
+func (s Text) Lib() *Map {
+	return protoText
 }
 
-func (s Str) Bool() Bool {
+func (s Text) Bool() Bool {
 	return Bool(len(s) > 0)
 }
 
-func (s Str) Byte() Byte {
+func (s Text) Blob() Blob {
 	return []byte(string(s))
 }
 
-type Byte []byte
+type Blob []byte
 
-func (b Byte) Type() string {
-	return "bytes"
+func (b Blob) Type() string {
+	return "blob"
 }
 
-func (b Byte) Lib() *Map {
-	return protoByte
+func (b Blob) Lib() *Map {
+	return protoBlob
 }
 
-func (b Byte) String() string {
+func (b Blob) String() string {
 	return hex.Dump([]byte(b))
 }
 
-func (b Byte) Str() Str {
-	return Str(string(b))
+func (b Blob) Blob() Blob {
+	return b
 }
 
-func (b Byte) Len() int64 {
+func (b Blob) Text() Text {
+	return Text(string(b))
+}
+
+func (b Blob) Len() int64 {
 	return int64(len(b))
 }
 
-func (b Byte) Bool() Bool {
+func (b Blob) Bool() Bool {
 	return Bool(len(b) > 0)
 }
 
@@ -323,8 +327,8 @@ func (r Rune) String() string {
 	return string([]rune{rune(r)})
 }
 
-func (r Rune) Str() Str {
-	return Str(r.String())
+func (r Rune) Text() Text {
+	return Text(r.String())
 }
 
 func (r Rune) Lib() *Map {
@@ -488,10 +492,10 @@ func (t *Map) String() string {
 		pairs := []string{}
 		for k, v := range t.data {
 			if _, is := v.(*Map); is {
-				v = Str("map")
+				v = Text("map")
 			}
 			if _, is := v.(*List); is {
-				v = Str("slice")
+				v = Text("slice")
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 			pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
@@ -525,10 +529,10 @@ func (s *List) String() string {
 	items := []string{}
 	for _, v := range s.data {
 		if _, is := v.(*Map); is {
-			v = Str("map")
+			v = Text("map")
 		}
 		if _, is := v.(*List); is {
-			v = Str("slice")
+			v = Text("slice")
 		}
 		items = append(items, tostring(v))
 	}
@@ -699,6 +703,10 @@ func toInt(n Int) Any {
 	return n
 }
 
+func concat(a, b Any) Text {
+	return Text(totext(a) + totext(b))
+}
+
 func add(a, b Any) Any {
 	if ai, is := isInt(a); is {
 		if bi, is := isInt(b); is {
@@ -714,9 +722,6 @@ func add(a, b Any) Any {
 		if bd, is := b.(DecIsh); is {
 			return Dec(float64(ad.Dec()) + float64(bd.Dec()))
 		}
-	}
-	if _, is := a.(StrIsh); is {
-		return Str(tostring(a) + tostring(b))
 	}
 	panic(fmt.Errorf("invalid addition: %v %v", a, b))
 }
@@ -833,8 +838,8 @@ func lt(a, b Any) bool {
 			return float64(ad.Dec()) < float64(bd.Dec())
 		}
 	}
-	if as, is := a.(Str); is {
-		if bs, is := b.(Str); is {
+	if as, is := a.(Text); is {
+		if bs, is := b.(Text); is {
 			return strings.Compare(string(as), string(bs)) < 0
 		}
 	}
@@ -987,7 +992,7 @@ func loop(fn func()) {
 }
 
 func trymethod(t Any, k string, def Any) Any {
-	t, m := method(t, Str(k))
+	t, m := method(t, Text(k))
 	if m != nil {
 		if _, is := m.(Func); is {
 			vm := &VM{}
@@ -999,7 +1004,12 @@ func trymethod(t Any, k string, def Any) Any {
 }
 
 func tostring(s Any) string {
-	return trymethod(s, "string", Str("(nil)")).(StrIsh).Str().String()
+	return trymethod(s, "string", Text("(nil)")).(TextIsh).Text().String()
+}
+
+func totext(s Any) string {
+	t := trymethod(s, "text", s)
+	return t.(TextIsh).Text().String()
 }
 
 func tobool(s Any) bool {
@@ -1040,9 +1050,9 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
 	vm.da(aa)
 	if aa != nil {
-		return join(vm, Str(v.Type()))
+		return join(vm, Text(v.Type()))
 	}
-	return join(vm, Str("nil"))
+	return join(vm, Text("nil"))
 })
 
 var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
@@ -1090,29 +1100,24 @@ type Closer interface {
 
 func init() {
 	protoDef = NewMap(MapData{
-		Str("string"): Func(func(vm *VM, aa *Args) *Args {
+		Text("string"): Func(func(vm *VM, aa *Args) *Args {
 			a := aa.get(0)
 			vm.da(aa)
 			if a == nil {
-				return join(vm, Str("(nil)"))
+				return join(vm, Text("(nil)"))
 			}
-			return join(vm, Str(a.String()))
+			return join(vm, Text(a.String()))
 		}),
-		Str("status"): Func(func(vm *VM, aa *Args) *Args {
+		Text("text"): Func(func(vm *VM, aa *Args) *Args {
 			a := aa.get(0)
 			vm.da(aa)
-			if a == nil {
-				return join(vm, NewStatus(nil))
-			}
-			return join(vm, NewStatus(errors.New(tostring(a))))
+			return join(vm, a.(TextIsh).Text())
 		}),
 	})
-	protoInt = NewMap(MapData{})
-	protoInt.meta = protoDef
-	protoDec = NewMap(MapData{})
-	protoDec.meta = protoDef
+	protoInt = protoDef
+	protoDec = protoDef
 	protoMap = NewMap(MapData{
-		Str("keys"): Func(func(vm *VM, aa *Args) *Args {
+		Text("keys"): Func(func(vm *VM, aa *Args) *Args {
 			keys := []Any{}
 			for k, _ := range aa.get(0).(*Map).data {
 				keys = append(keys, k)
@@ -1123,14 +1128,14 @@ func init() {
 	})
 	protoMap.meta = protoDef
 	protoList = NewMap(MapData{
-		Str("push"): Func(func(vm *VM, aa *Args) *Args {
+		Text("push"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append(l.data, v)
 			return join(vm, l)
 		}),
-		Str("pop"): Func(func(vm *VM, aa *Args) *Args {
+		Text("pop"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			n := len(l.data) - 1
 			vm.da(aa)
@@ -1141,14 +1146,14 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str("shove"): Func(func(vm *VM, aa *Args) *Args {
+		Text("shove"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			v := aa.get(1)
 			vm.da(aa)
 			l.data = append([]Any{v}, l.data...)
 			return join(vm, l)
 		}),
-		Str("shift"): Func(func(vm *VM, aa *Args) *Args {
+		Text("shift"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			vm.da(aa)
 			var v Any
@@ -1158,17 +1163,17 @@ func init() {
 			}
 			return join(vm, v)
 		}),
-		Str("join"): Func(func(vm *VM, aa *Args) *Args {
+		Text("join"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
-			j := ifnil(aa.get(1), Str(""))
+			j := ifnil(aa.get(1), Text(""))
 			vm.da(aa)
 			var ls []string
 			for _, s := range l.data {
-				ls = append(ls, tostring(s))
+				ls = append(ls, totext(s))
 			}
-			return join(vm, Str(strings.Join(ls, tostring(j))))
+			return join(vm, Text(strings.Join(ls, totext(j))))
 		}),
-		Str("sort"): Func(func(vm *VM, aa *Args) *Args {
+		Text("sort"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
 			f := aa.get(1).(Func)
 			vm.da(aa)
@@ -1180,19 +1185,19 @@ func init() {
 	})
 	protoList.meta = protoDef
 	protoChan = NewMap(MapData{
-		Str("read"): Func(func(vm *VM, aa *Args) *Args {
+		Text("read"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			return join(vm, <-c.c)
 		}),
-		Str("write"): Func(func(vm *VM, aa *Args) *Args {
+		Text("write"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			a := aa.get(1)
 			vm.da(aa)
 			c.c <- a
 			return join(vm, NewStatus(nil))
 		}),
-		Str("close"): Func(func(vm *VM, aa *Args) *Args {
+		Text("close"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			close(c.c)
@@ -1201,7 +1206,7 @@ func init() {
 	})
 	protoChan.meta = protoDef
 	protoGroup = NewMap(MapData{
-		Str("run"): Func(func(vm *VM, aa *Args) *Args {
+		Text("run"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			f := aa.get(1).(Func)
 			ab := vm.ga(aa.len() - 2)
@@ -1212,7 +1217,7 @@ func init() {
 			vm.da(aa)
 			return join(vm, NewStatus(nil))
 		}),
-		Str("wait"): Func(func(vm *VM, aa *Args) *Args {
+		Text("wait"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
 			vm.da(aa)
 			g.Wait()
@@ -1220,31 +1225,31 @@ func init() {
 		}),
 	})
 	protoGroup.meta = protoDef
-	protoStr = NewMap(MapData{
-		Str("bytes"): Func(func(vm *VM, aa *Args) *Args {
-			s := tostring(aa.get(0))
+	protoText = NewMap(MapData{
+		Text("blob"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
 			vm.da(aa)
-			return join(vm, Byte(s))
+			return join(vm, Blob(s))
 		}),
-		Str("split"): Func(func(vm *VM, aa *Args) *Args {
-			s := tostring(aa.get(0))
-			j := tostring(aa.get(1))
+		Text("split"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			j := totext(aa.get(1))
 			vm.da(aa)
 			l := []Any{}
 			for _, p := range strings.Split(s, j) {
-				l = append(l, Str(p))
+				l = append(l, Text(p))
 			}
 			return join(vm, NewList(l))
 		}),
 	})
-	protoStr.meta = protoDef
+	protoText.meta = protoDef
 	protoTick = NewMap(MapData{
-		Str("read"): Func(func(vm *VM, aa *Args) *Args {
+		Text("read"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Read())
 		}),
-		Str("stop"): Func(func(vm *VM, aa *Args) *Args {
+		Text("stop"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)
 			vm.da(aa)
 			return join(vm, ti.Stop())
@@ -1255,8 +1260,8 @@ func init() {
 	protoInst = protoDef
 
 	libTime = NewMap(MapData{
-		Str("ms"): Int(int64(time.Millisecond)),
-		Str("ticker"): Func(func(vm *VM, aa *Args) *Args {
+		Text("ms"): Int(int64(time.Millisecond)),
+		Text("ticker"): Func(func(vm *VM, aa *Args) *Args {
 			d := int64(aa.get(0).(Int))
 			vm.da(aa)
 			return join(vm, NewTicker(time.Duration(d)))
@@ -1265,11 +1270,11 @@ func init() {
 	Ntime = libTime
 
 	libSync = NewMap(MapData{
-		Str("group"): Func(func(vm *VM, aa *Args) *Args {
+		Text("group"): Func(func(vm *VM, aa *Args) *Args {
 			vm.da(aa)
 			return join(vm, NewGroup())
 		}),
-		Str("channel"): Func(func(vm *VM, aa *Args) *Args {
+		Text("channel"): Func(func(vm *VM, aa *Args) *Args {
 			n := int(aa.get(0).(IntIsh).Int())
 			vm.da(aa)
 			return join(vm, NewChan(n))
@@ -1278,13 +1283,13 @@ func init() {
 	Nsync = libSync
 
 	libIO = NewMap(MapData{
-		Str("stdin"):  NewStream(os.Stdin),
-		Str("stdout"): NewStream(os.Stdout),
-		Str("stderr"): NewStream(os.Stderr),
+		Text("stdin"):  NewStream(os.Stdin),
+		Text("stdout"): NewStream(os.Stdout),
+		Text("stderr"): NewStream(os.Stderr),
 
-		Str("open"): Func(func(vm *VM, aa *Args) *Args {
-			path := tostring(aa.get(0))
-			modes := tostring(aa.get(1))
+		Text("open"): Func(func(vm *VM, aa *Args) *Args {
+			path := totext(aa.get(0))
+			modes := totext(aa.get(1))
 			mode := os.O_RDONLY
 			switch modes {
 			case "r":
@@ -1311,11 +1316,18 @@ func init() {
 	})
 	Nio = libIO
 
-	protoByte = protoDef
+	protoBlob = NewMap(MapData{
+		Text("text"): Func(func(vm *VM, aa *Args) *Args {
+			bin := aa.get(0).(BlobIsh).Blob()
+			vm.da(aa)
+			return join(vm, bin.Text())
+		}),
+	})
+	protoBlob.meta = protoDef
 
 	protoStream = NewMap(MapData{
 
-		Str("read"): Func(func(vm *VM, aa *Args) *Args {
+		Text("read"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			limit := ifnil(aa.get(1), Int(1024*1024)).(IntIsh).Int()
 			vm.da(aa)
@@ -1324,20 +1336,20 @@ func init() {
 			}
 			buff := make([]byte, int(limit))
 			length, err := stream.s.(io.Reader).Read(buff)
-			return join(vm, NewStatus(err), Byte(buff[:length]))
+			return join(vm, NewStatus(err), Blob(buff[:length]))
 		}),
 
-		Str("readall"): Func(func(vm *VM, aa *Args) *Args {
+		Text("readall"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
 			if _, is := stream.s.(io.Reader); !is {
 				return join(vm, NewStatus(errors.New("not a reader")))
 			}
 			buff, err := ioutil.ReadAll(stream.s.(io.Reader))
-			return join(vm, NewStatus(err), Byte(buff))
+			return join(vm, NewStatus(err), Blob(buff))
 		}),
 
-		Str("readrune"): Func(func(vm *VM, aa *Args) *Args {
+		Text("readrune"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
 			if r, is := stream.s.(ReadRuner); is {
@@ -1347,9 +1359,9 @@ func init() {
 			return join(vm, NewStatus(errors.New("not a reader")))
 		}),
 
-		Str("write"): Func(func(vm *VM, aa *Args) *Args {
+		Text("write"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
-			data := aa.get(1).(ByteIsh).Byte()
+			data := aa.get(1).(BlobIsh).Blob()
 			vm.da(aa)
 			if _, is := stream.s.(io.Writer); !is {
 				return join(vm, NewStatus(errors.New("not a writer")))
@@ -1358,13 +1370,13 @@ func init() {
 			return join(vm, NewStatus(err), Int(length))
 		}),
 
-		Str("flush"): Func(func(vm *VM, aa *Args) *Args {
+		Text("flush"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
 			return join(vm, NewStatus(stream.Flush()))
 		}),
 
-		Str("close"): Func(func(vm *VM, aa *Args) *Args {
+		Text("close"): Func(func(vm *VM, aa *Args) *Args {
 			stream := aa.get(0).(Stream)
 			vm.da(aa)
 			return join(vm, NewStatus(stream.Close()))
