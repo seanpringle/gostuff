@@ -15,7 +15,8 @@ func NewNodeVar(name *NodeName) *NodeVar {
 }
 
 func (nd *NodeVar) Format() string {
-	return fmt.Sprintf("var %s Any", nd.name.Format())
+	name := nd.name.Format()
+	return fmt.Sprintf("var %s Any; noop(%s)", name, name)
 }
 
 func (nd *NodeVar) String() string {

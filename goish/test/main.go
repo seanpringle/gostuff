@@ -15,6 +15,7 @@ import "runtime/pprof"
 import "encoding/hex"
 import "bufio"
 import "errors"
+import "encoding/json"
 
 type Any interface {
 	Type() string
@@ -1042,6 +1043,15 @@ var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
 	return aa
 })
 
+var Nlog Any = Func(func(vm *VM, aa *Args) *Args {
+	parts := []string{}
+	for i := 0; i < aa.len(); i++ {
+		parts = append(parts, tostring(aa.get(i)))
+	}
+	fmt.Fprintf(os.Stderr, "%s\n", strings.Join(parts, "\t"))
+	return aa
+})
+
 var Nio *Map
 var Ntime *Map
 var Nsync *Map
@@ -1231,6 +1241,40 @@ func init() {
 			vm.da(aa)
 			return join(vm, Blob(s))
 		}),
+		Text("json"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			var m interface{}
+			err := json.Unmarshal([]byte(s), &m)
+			var walk func(v interface{}) Any
+			walk = func(v interface{}) Any {
+				switch v.(type) {
+				case int:
+					return Int(v.(int))
+				case int64:
+					return Int(v.(int64))
+				case float64:
+					return Dec(v.(float64))
+				case string:
+					return Text(v.(string))
+				case []interface{}:
+					vals := []Any{}
+					for _, v := range v.([]interface{}) {
+						vals = append(vals, walk(v))
+					}
+					return NewList(vals)
+				case map[string]interface{}:
+					pairs := NewMap(MapData{})
+					for k, v := range v.(map[string]interface{}) {
+						pairs.Set(Text(k), walk(v))
+					}
+					return pairs
+				}
+				return nil
+			}
+			return join(vm, NewStatus(err), walk(m))
+		}),
+
 		Text("split"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			j := totext(aa.get(1))
@@ -1385,35 +1429,40 @@ func init() {
 	protoStream.meta = protoDef
 }
 
-const S19 Text = Text("channel")
-const S25 Text = Text("readall")
-const S27 Text = Text("slurp")
-const S29 Text = Text("escape")
-const S11 Text = Text("ticker")
-const S13 Text = Text("read")
-const S14 Text = Text("lock")
-const S4 Text = Text("len")
-const S12 Text = Text("stop")
-const S10 Text = Text("keys")
-const S20 Text = Text("queue")
-const S26 Text = Text("close")
-const S6 Text = Text("max")
-const S18 Text = Text("push")
-const S28 Text = Text("serve")
-const S1 Text = Text("stdin")
-const S2 Text = Text("pop")
-const S3 Text = Text("type")
-const S17 Text = Text("shift")
-const S21 Text = Text("readrune")
 const S7 Text = Text("min")
-const S8 Text = Text("set")
-const S15 Text = Text("write")
-const S24 Text = Text("open")
-const S16 Text = Text("jobs")
-const S22 Text = Text("join")
-const S23 Text = Text("readline")
+const S27 Text = Text("slurp")
 const S5 Text = Text("iterate")
+const S12 Text = Text("stop")
+const S28 Text = Text("run")
+const S33 Text = Text("text")
+const S13 Text = Text("read")
+const S16 Text = Text("jobs")
+const S17 Text = Text("shift")
+const S25 Text = Text("readall")
+const S29 Text = Text("json")
+const S3 Text = Text("type")
+const S11 Text = Text("ticker")
+const S20 Text = Text("queue")
+const S21 Text = Text("readrune")
+const S34 Text = Text("wait")
+const S2 Text = Text("pop")
+const S6 Text = Text("max")
+const S8 Text = Text("set")
 const S9 Text = Text("get")
+const S22 Text = Text("join")
+const S14 Text = Text("lock")
+const S18 Text = Text("push")
+const S19 Text = Text("channel")
+const S24 Text = Text("open")
+const S26 Text = Text("close")
+const S30 Text = Text("serve")
+const S31 Text = Text("websocket")
+const S1 Text = Text("stdin")
+const S4 Text = Text("len")
+const S10 Text = Text("keys")
+const S15 Text = Text("write")
+const S23 Text = Text("readline")
+const S32 Text = Text("group")
 
 func main() {
 
@@ -1433,16 +1482,28 @@ func main() {
 	vm := &VM{}
 
 	{
-		var Nlist Any
-		var Ntrue Any
-		var Nfalse Any
 		var Nsuper Any
-		var Ninteger Any
-		var Ndecimal Any
+		noop(Nsuper)
 		var Nstring Any
+		noop(Nstring)
+		var Nlist Any
+		noop(Nlist)
 		var Nmap Any
-		var Nstream Any
+		noop(Nmap)
 		var Nnil Any
+		noop(Nnil)
+		var Ninteger Any
+		noop(Ninteger)
+		var Ndecimal Any
+		noop(Ndecimal)
+		var Nstream Any
+		noop(Nstream)
+		var Ntrue Any
+		noop(Ntrue)
+		var Nfalse Any
+		noop(Nfalse)
+		var Nplay Any
+		noop(Nplay)
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Nsuper = a; return a }()
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Ninteger = a; return a }()
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Ndecimal = a; return a }()
@@ -1472,6 +1533,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Nsuper; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1506,6 +1568,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Ninteger; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1514,6 +1577,7 @@ func main() {
 						vm.da(aa)
 						{
 							var Ni Any
+							noop(Ni)
 							func() Any { a := Int(0); Ni = a; return a }()
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
@@ -1605,6 +1669,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Ndecimal; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1679,6 +1744,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Nlist; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1687,6 +1753,7 @@ func main() {
 						vm.da(aa)
 						{
 							var Ni Any
+							noop(Ni)
 							func() Any { a := Int(0); Ni = a; return a }()
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
@@ -1810,6 +1877,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Nmap; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1818,8 +1886,11 @@ func main() {
 						vm.da(aa)
 						{
 							var Ni Any
+							noop(Ni)
 							var Nkeys Any
+							noop(Nkeys)
 							var Nkey Any
+							noop(Nkey)
 							func() Any { a := Int(0); Ni = a; return a }()
 							func() Any {
 								a := one(vm, func() *Args {
@@ -1956,7 +2027,9 @@ func main() {
 			vm.da(aa)
 			{
 				var Nti Any
+				noop(Nti)
 				var Ntick Any
+				noop(Ntick)
 				func() Any {
 					a := one(vm, call(vm, find(Ntime, S11 /* ticker */), join(vm, Int(1000000))))
 					Nti = a
@@ -1974,6 +2047,7 @@ func main() {
 						vm.da(aa)
 						{
 							var Ni Any
+							noop(Ni)
 							func() Any { a := Int(0); Ni = a; return a }()
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
@@ -1998,6 +2072,7 @@ func main() {
 			vm.da(aa)
 			{
 				var NprotoQueue Any
+				noop(NprotoQueue)
 				func() Any {
 					a := one(vm, NewMap(MapData{
 						S13 /* read */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -2006,6 +2081,7 @@ func main() {
 							vm.da(aa)
 							{
 								var Njob Any
+								noop(Njob)
 								vm.da(func() *Args {
 									t, m := method(find(Nq, S14 /* lock */), S15 /* write */)
 									return call(vm, m, join(vm, t, nil))
@@ -2054,6 +2130,7 @@ func main() {
 							vm.da(aa)
 							{
 								var Njobs Any
+								noop(Njobs)
 								vm.da(func() *Args {
 									t, m := method(find(Nq, S14 /* lock */), S15 /* write */)
 									return call(vm, m, join(vm, t, nil))
@@ -2100,6 +2177,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Nstream; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -2108,8 +2186,11 @@ func main() {
 						vm.da(aa)
 						{
 							var Nline Any
+							noop(Nline)
 							var Nok Any
+							noop(Nok)
 							var Nc Any
+							noop(Nc)
 							func() Any { a := one(vm, NewList([]Any{})); Nline = a; return a }()
 							loop(func() {
 								for truth(one(vm, func() *Args {
@@ -2162,8 +2243,11 @@ func main() {
 						vm.da(aa)
 						{
 							var Ndone Any
+							noop(Ndone)
 							var Nok Any
+							noop(Nok)
 							var Nline Any
+							noop(Nline)
 							func() Any { a := Nfalse; Ndone = a; return a }()
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
@@ -2198,6 +2282,7 @@ func main() {
 			vm.da(aa)
 			{
 				var Np Any
+				noop(Np)
 				func() Any { a := Nio; Np = a; return a }()
 				func() Any {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -2206,8 +2291,11 @@ func main() {
 						vm.da(aa)
 						{
 							var Nok Any
+							noop(Nok)
 							var Nfile Any
+							noop(Nfile)
 							var Ncontent Any
+							noop(Ncontent)
 							if truth(one(vm, func() *Args {
 								aa := join(vm, call(vm, find(Nio, S24 /* open */), join(vm, Npath, Text("r"))))
 								Nok = aa.get(0)
@@ -2244,19 +2332,236 @@ func main() {
 			}
 			return nil
 		}), join(vm, nil)))
-		vm.da(call(vm, find(Nhttp, S28 /* serve */), join(vm, Text(":3000"), NewMap(MapData{
-			Text("/"): one(vm, Func(func(vm *VM, aa *Args) *Args {
+		vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
+			vm.da(aa)
+			{
+				var Np Any
+				noop(Np)
+				func() Any {
+					a := one(vm, call(vm, Ngetprototype, join(vm, call(vm, find(Nsync, S19 /* channel */), join(vm, Int(1))))))
+					Np = a
+					return a
+				}()
+				func() Any {
+					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nchan := aa.get(0)
+						noop(Nchan)
+						vm.da(aa)
+						{
+							return join(vm, Func(func(vm *VM, aa *Args) *Args {
+								vm.da(aa)
+								{
+									return join(vm, func() *Args {
+										t, m := method(Nchan, S13 /* read */)
+										return call(vm, m, join(vm, t, nil))
+									}())
+								}
+								return nil
+							}))
+						}
+						return nil
+					}))
+					store(Np, S5 /* iterate */, a)
+					return a
+				}()
+			}
+			return nil
+		}), join(vm, nil)))
+		func() Any {
+			a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+				Ngroup := aa.get(0)
+				noop(Ngroup)
+				Ninbox := aa.get(1)
+				noop(Ninbox)
+				vm.da(aa)
+				{
+					var Noutbox Any
+					noop(Noutbox)
+					func() Any {
+						a := one(vm, call(vm, find(Nsync, S19 /* channel */), join(vm, Int(8))))
+						Noutbox = a
+						return a
+					}()
+					vm.da(func() *Args {
+						t, m := method(Ngroup, S28 /* run */)
+						return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
+							vm.da(aa)
+							{
+								var Nmsg Any
+								noop(Nmsg)
+								var Nok Any
+								noop(Nok)
+								loop(func() {
+									it := iterate(Ninbox)
+									for {
+										aa := it(vm, nil)
+										if aa.get(0) == nil {
+											vm.da(aa)
+											break
+										}
+										vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
+											Nmsg := aa.get(0)
+											noop(Nmsg)
+											vm.da(aa)
+											{
+												if truth(one(vm, func() *Args {
+													aa := join(vm, func() *Args {
+														t, m := method(Nmsg, S29 /* json */)
+														return call(vm, m, join(vm, t, nil))
+													}())
+													Nok = aa.get(0)
+													Nmsg = aa.get(1)
+													return aa
+												}())) {
+													{
+														vm.da(call(vm, Nprint, join(vm, Text("got"), Nmsg)))
+														vm.da(func() *Args {
+															t, m := method(Noutbox, S15 /* write */)
+															return call(vm, m, join(vm, t, Text("ok")))
+														}())
+													}
+												} else {
+													{
+														vm.da(call(vm, Nlog, join(vm, Nok)))
+													}
+												}
+											}
+											return nil
+										}), aa))
+									}
+								})
+								vm.da(func() *Args {
+									t, m := method(Noutbox, S26 /* close */)
+									return call(vm, m, join(vm, t, nil))
+								}())
+							}
+							return nil
+						})))
+					}())
+					return join(vm, Noutbox)
+				}
+				return nil
+			}))
+			Nplay = a
+			return a
+		}()
+		vm.da(call(vm, find(Nhttp, S30 /* serve */), join(vm, Text(":3000"), Text("static/"), NewMap(MapData{
+			Text("/join"): one(vm, Func(func(vm *VM, aa *Args) *Args {
 				Nreq := aa.get(0)
 				noop(Nreq)
 				vm.da(aa)
 				{
-					vm.da(func() *Args {
-						t, m := method(Nreq, S15 /* write */)
-						return call(vm, m, join(vm, t, func() *Args {
-							t, m := method(Text("<b>hello</b> world"), S29 /* escape */)
+					var Ng Any
+					noop(Ng)
+					var Ninbox Any
+					noop(Ninbox)
+					var Noutbox Any
+					noop(Noutbox)
+					var Nok Any
+					noop(Nok)
+					var Nws Any
+					noop(Nws)
+					if truth(one(vm, func() *Args {
+						aa := join(vm, func() *Args {
+							t, m := method(Nreq, S31 /* websocket */)
 							return call(vm, m, join(vm, t, nil))
-						}()))
-					}())
+						}())
+						Nok = aa.get(0)
+						Nws = aa.get(1)
+						return aa
+					}())) {
+						{
+							func() Any { a := one(vm, call(vm, find(Nsync, S32 /* group */), join(vm, nil))); Ng = a; return a }()
+							func() Any {
+								a := one(vm, call(vm, find(Nsync, S19 /* channel */), join(vm, Int(8))))
+								Ninbox = a
+								return a
+							}()
+							func() Any { a := one(vm, call(vm, Nplay, join(vm, Ng, Ninbox))); Noutbox = a; return a }()
+							vm.da(func() *Args {
+								t, m := method(Ng, S28 /* run */)
+								return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
+									vm.da(aa)
+									{
+										var Nok Any
+										noop(Nok)
+										var Nmode Any
+										noop(Nmode)
+										var Nmsg Any
+										noop(Nmsg)
+										loop(func() {
+											for truth(one(vm, func() *Args {
+												aa := join(vm, func() *Args {
+													t, m := method(Nws, S13 /* read */)
+													return call(vm, m, join(vm, t, nil))
+												}())
+												Nok = aa.get(0)
+												Nmode = aa.get(1)
+												Nmsg = aa.get(2)
+												return aa
+											}())) {
+												vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
+													vm.da(aa)
+													{
+														vm.da(func() *Args {
+															t, m := method(Ninbox, S15 /* write */)
+															return call(vm, m, join(vm, t, func() *Args {
+																t, m := method(Nmsg, S33 /* text */)
+																return call(vm, m, join(vm, t, nil))
+															}()))
+														}())
+													}
+													return nil
+												}), nil))
+											}
+										})
+										vm.da(call(vm, Nlog, join(vm, Nok)))
+										vm.da(func() *Args {
+											t, m := method(Ninbox, S26 /* close */)
+											return call(vm, m, join(vm, t, nil))
+										}())
+									}
+									return nil
+								})))
+							}())
+							vm.da(func() *Args {
+								t, m := method(Ng, S28 /* run */)
+								return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
+									vm.da(aa)
+									{
+										loop(func() {
+											it := iterate(Noutbox)
+											for {
+												aa := it(vm, nil)
+												if aa.get(0) == nil {
+													vm.da(aa)
+													break
+												}
+												vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
+													Nmsg := aa.get(0)
+													noop(Nmsg)
+													vm.da(aa)
+													{
+														vm.da(func() *Args {
+															t, m := method(Nws, S15 /* write */)
+															return call(vm, m, join(vm, t, find(Nws, S33 /* text */), Nmsg))
+														}())
+													}
+													return nil
+												}), aa))
+											}
+										})
+									}
+									return nil
+								})))
+							}())
+							vm.da(func() *Args {
+								t, m := method(Ng, S34 /* wait */)
+								return call(vm, m, join(vm, t, nil))
+							}())
+							vm.da(call(vm, Nlog, join(vm, Text("done"))))
+						}
+					}
 				}
 				return nil
 			}))}))))

@@ -212,3 +212,13 @@ function()
 	end
 
 end()
+
+function()
+	p = getprototype(sync.channel(1))
+
+	p.iterate = function(chan)
+		return do
+			return chan:read()
+		end
+	end
+end()

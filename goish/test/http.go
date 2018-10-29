@@ -51,8 +51,12 @@ func init() {
 		libHttp = NewMap(MapData{
 			Text("serve"): Func(func(vm *VM, aa *Args) *Args {
 				addr := totext(aa.get(0))
-				routes := aa.get(1).(*Map)
+				static := totext(aa.get(1))
+				routes := aa.get(2).(*Map)
 				vm.da(aa)
+
+				http.Handle("/", http.FileServer(http.Dir(static)))
+
 				for pattern, handler := range routes.data {
 					http.HandleFunc(totext(pattern), func(w http.ResponseWriter, r *http.Request) {
 						r.ParseForm()
@@ -65,7 +69,7 @@ func init() {
 		})
 		Nhttp = libHttp
 
-		protoText.Set(Text("escape"), Func(func(vm *VM, aa *Args) *Args {
+		protoText.Set(Text("htmlescape"), Func(func(vm *VM, aa *Args) *Args {
 			str := totext(aa.get(0))
 			vm.da(aa)
 			return join(vm, Text(html.EscapeString(str)))

@@ -1,6 +1,47 @@
 
-http.serve(":3000", {
-	"/" = function(req)
-		req:write("<b>hello</b> world":escape())
+play = function(group, inbox)
+
+	outbox = sync.channel(8)
+
+	group:run(function()
+		for inbox do(msg)
+			if ok, msg = msg:json() then
+				print("got", msg)
+				outbox:write("ok")
+			else
+				log(ok)
+			end
+		end
+		outbox:close()
+	end)
+
+	return outbox
+end
+
+http.serve(":3000", "static/", {
+	"/join" = function(req)
+
+		if ok, ws = req:websocket() then
+			g = sync.group()
+
+			inbox = sync.channel(8)
+			outbox = play(g, inbox)
+
+			g:run(function()
+				while ok, mode, msg = ws:read() do
+					inbox:write(msg:text())
+				end
+				log(ok)
+				inbox:close()
+			end)
+
+			g:run(function()
+				for outbox do(msg)
+					ws:write(ws.text, msg)
+				end
+			end)
+
+			g:wait()
+		end
 	end,
 })

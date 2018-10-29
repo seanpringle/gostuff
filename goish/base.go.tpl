@@ -15,6 +15,7 @@ import "runtime/pprof"
 import "encoding/hex"
 import "bufio"
 import "errors"
+import "encoding/json"
 
 type Any interface {
 	Type() string
@@ -1042,6 +1043,15 @@ var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
 	return aa
 })
 
+var Nlog Any = Func(func(vm *VM, aa *Args) *Args {
+	parts := []string{}
+	for i := 0; i < aa.len(); i++ {
+		parts = append(parts, tostring(aa.get(i)))
+	}
+	fmt.Fprintf(os.Stderr, "%s\n", strings.Join(parts, "\t"))
+	return aa
+})
+
 var Nio *Map
 var Ntime *Map
 var Nsync *Map
@@ -1231,6 +1241,40 @@ func init() {
 			vm.da(aa)
 			return join(vm, Blob(s))
 		}),
+		Text("json"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			var m interface{}
+			err := json.Unmarshal([]byte(s), &m)
+			var walk func(v interface{}) Any
+			walk = func(v interface{}) Any {
+				switch v.(type) {
+				case int:
+					return Int(v.(int))
+				case int64:
+					return Int(v.(int64))
+				case float64:
+					return Dec(v.(float64))
+				case string:
+					return Text(v.(string))
+				case []interface{}:
+					vals := []Any{}
+					for _, v := range v.([]interface{}) {
+						vals = append(vals, walk(v))
+					}
+					return NewList(vals)
+				case map[string]interface{}:
+					pairs := NewMap(MapData{})
+					for k, v := range v.(map[string]interface{}) {
+						pairs.Set(Text(k), walk(v))
+					}
+					return pairs
+				}
+				return nil
+			}
+			return join(vm, NewStatus(err), walk(m))
+		}),
+
 		Text("split"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			j := totext(aa.get(1))

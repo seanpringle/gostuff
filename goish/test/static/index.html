@@ -1,0 +1,21 @@
+<html>
+<head>
+	<title>untitled</title>
+	<script type="text/javascript">
+		function run() {
+			var ws = new WebSocket("ws://localhost:3000/join");
+
+			ws.onopen = function() {
+				ws.send(JSON.stringify({a: 1 }));
+			};
+
+			ws.onmessage = function (evt) {
+				console.log(evt)
+			}
+		}
+	</script>
+</head>
+<body onload="run()">
+	hello hello
+</body>
+</html>
