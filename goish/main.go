@@ -421,15 +421,16 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		p.take()
 		p.take()
-		ensure(p.scan() == '(', "expected opening paren (func)")
-		p.take()
 		var args Nodes
-		argTup := p.tuple(block, nil)
-		if argTup != nil {
-			args = Nodes(argTup.(NodeTuple))
+		if p.scan() == '(' {
+			p.take()
+			argTup := p.tuple(block, nil)
+			if argTup != nil {
+				args = Nodes(argTup.(NodeTuple))
+			}
+			ensure(p.scan() == ')', "expected closing paren (func)")
+			p.take()
 		}
-		ensure(p.scan() == ')', "expected closing paren (func)")
-		p.take()
 		body := p.block(block, Scope{}, nil).(*NodeBlock)
 		ensure(p.peek("end"), "expected: end (function)")
 		p.take()
@@ -596,6 +597,24 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 
 		return NewNodeMap(t)
+	}
+
+	if p.scan() == '[' && p.char(1) == '[' {
+		p.take()
+		p.take()
+		str := ""
+		for p.next() != rune(0) && !(p.next() == ']' && p.char(1) == ']') {
+			c := p.take()
+			if c == '`' {
+				str = str + "` + \"`\" + `"
+			} else {
+				str = str + string(c)
+			}
+		}
+		ensure(p.next() == ']' && p.char(1) == ']', "expected closing brackets ([[string]])")
+		p.take()
+		p.take()
+		return NewNodeLitStr("`" + str + "`")
 	}
 
 	if p.scan() == '[' {

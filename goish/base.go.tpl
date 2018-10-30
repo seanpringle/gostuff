@@ -3,7 +3,8 @@ package main
 import "fmt"
 import "math"
 import "strings"
-import "strconv"
+
+//import "strconv"
 import "sync"
 import "time"
 import "log"
@@ -16,6 +17,7 @@ import "encoding/hex"
 import "bufio"
 import "errors"
 import "encoding/json"
+import "regexp"
 
 type Any interface {
 	Type() string
@@ -24,8 +26,9 @@ type Any interface {
 }
 
 type VM struct {
-	argsC [8]*Args
-	argsN int
+	argsC   [8]*Args
+	argsN   int
+	reCache map[string]*regexp.Regexp
 }
 
 func (vm *VM) ga(n int) *Args {
@@ -231,7 +234,7 @@ func (b Blob) Bool() Bool {
 type Int int64
 
 func (i Int) String() string {
-	return fmt.Sprintf("%d", int64(i))
+	return fmt.Sprintf("%v", int64(i))
 }
 
 func (i Int) Int() Int {
@@ -295,7 +298,8 @@ func init() {
 type Dec float64
 
 func (d Dec) String() string {
-	return strconv.FormatFloat(float64(d), 'f', -1, 64)
+	//return strconv.FormatFloat(float64(d), 'f', -1, 64)
+	return fmt.Sprintf("%v", float64(d))
 }
 
 func (i Dec) Bool() Bool {
@@ -462,9 +466,11 @@ func (t *Map) Find(key Any) Any {
 		if t.meta != nil {
 			if l, is := t.meta.(*List); is {
 				for _, i := range l.data {
-					r := find(i, key)
-					if r != nil {
-						return r
+					if m, is := i.(*Map); is {
+						v := m.Find(key)
+						if v != nil {
+							return v
+						}
 					}
 				}
 			}
@@ -496,7 +502,7 @@ func (t *Map) String() string {
 				v = Text("map")
 			}
 			if _, is := v.(*List); is {
-				v = Text("slice")
+				v = Text("list")
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 			pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
@@ -533,7 +539,7 @@ func (s *List) String() string {
 			v = Text("map")
 		}
 		if _, is := v.(*List); is {
-			v = Text("slice")
+			v = Text("list")
 		}
 		items = append(items, tostring(v))
 	}
@@ -1017,6 +1023,21 @@ func tobool(s Any) bool {
 	return bool(trymethod(s, "bool", Bool(false)).(BoolIsh).Bool())
 }
 
+func toregexp(vm *VM, p string) *regexp.Regexp {
+
+	if vm.reCache == nil {
+		vm.reCache = map[string]*regexp.Regexp{}
+	}
+
+	re, have := vm.reCache[p]
+	if !have {
+		re = regexp.MustCompile(p)
+		vm.reCache[p] = re
+	}
+
+	return re
+}
+
 func length(v Any) Any {
 	if l, is := v.(LenIsh); is {
 		return Int(l.Len())
@@ -1087,6 +1108,7 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 
 var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
+	vm.da(aa)
 	if v == nil {
 		return join(vm, protoDef)
 	}
@@ -1124,8 +1146,19 @@ func init() {
 			return join(vm, a.(TextIsh).Text())
 		}),
 	})
-	protoInt = protoDef
-	protoDec = protoDef
+
+	protoInt = NewMap(MapData{
+		Text("huge"): Int(math.MaxInt64),
+		Text("tiny"): Int(math.MinInt64),
+	})
+	protoInt.meta = protoDef
+
+	protoDec = NewMap(MapData{
+		Text("huge"): Dec(math.MaxFloat64),
+		Text("tiny"): Dec(math.SmallestNonzeroFloat64),
+	})
+	protoDec.meta = protoDef
+
 	protoMap = NewMap(MapData{
 		Text("keys"): Func(func(vm *VM, aa *Args) *Args {
 			keys := []Any{}
@@ -1204,8 +1237,16 @@ func init() {
 			c := aa.get(0).(*Chan)
 			a := aa.get(1)
 			vm.da(aa)
-			c.c <- a
-			return join(vm, NewStatus(nil))
+			rs := func() (err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = errors.New("channel closed")
+					}
+				}()
+				c.c <- a
+				return
+			}()
+			return join(vm, NewStatus(rs))
 		}),
 		Text("close"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
@@ -1285,8 +1326,25 @@ func init() {
 			}
 			return join(vm, NewList(l))
 		}),
+
+		Text("match"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			p := totext(aa.get(1))
+			vm.da(aa)
+			re := toregexp(vm, p)
+			m := re.FindStringSubmatch(s)
+			if m != nil {
+				l := []Any{}
+				for _, ss := range m {
+					l = append(l, Text(ss))
+				}
+				return join(vm, NewList(l))
+			}
+			return join(vm, nil)
+		}),
 	})
 	protoText.meta = protoDef
+
 	protoTick = NewMap(MapData{
 		Text("read"): Func(func(vm *VM, aa *Args) *Args {
 			ti := aa.get(0).(Ticker)

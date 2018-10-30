@@ -1,15 +1,71 @@
 
+services = function
+	api = {}
+	group = sync.group()
+
+	-- services.id()
+	seq = sync.channel(0)
+	api.id = function
+		return seq:read()
+	end
+	group:run(function
+		n = 1
+		while seq:write(n) do
+			n++
+		end
+	end)
+
+	-- services.stop()
+	api.stop = function
+		seq:close()
+		group:wait()
+	end
+
+	return api
+end()
+
+entity = function
+
+	id = services.id()
+	blinks = sync.queue()
+
+	x = 0
+	y = 0
+	move = do(mx, my)
+		x = mx
+		y = my
+	end
+
+	return {
+		blink = function(e)
+			for blinks do(fn)
+				fn(e)
+			end
+		end,
+
+		position = function(e)
+			return x, y
+		end,
+
+		move = function(e, x, y)
+			blinks:write(do
+				move(x, y)
+			end)
+		end,
+	}
+end
+
 play = function(group, inbox)
 
 	outbox = sync.channel(8)
 
-	group:run(function()
+	group:run(function
 		for inbox do(msg)
-			if ok, msg = msg:json() then
+			if try, msg = msg:json() then
 				print("got", msg)
 				outbox:write("ok")
 			else
-				log(ok)
+				log(try)
 			end
 		end
 		outbox:close()
@@ -22,26 +78,26 @@ http.serve(":3000", "static/", {
 	"/join" = function(req)
 
 		if ok, ws = req:websocket() then
-			g = sync.group()
+			group = sync.group()
 
 			inbox = sync.channel(8)
-			outbox = play(g, inbox)
+			outbox = play(group, inbox)
 
-			g:run(function()
-				while ok, mode, msg = ws:read() do
+			group:run(function
+				while try, mode, msg = ws:read() do
 					inbox:write(msg:text())
 				end
-				log(ok)
+				log(try)
 				inbox:close()
 			end)
 
-			g:run(function()
+			group:run(function
 				for outbox do(msg)
 					ws:write(ws.text, msg)
 				end
 			end)
 
-			g:wait()
+			group:wait()
 		end
 	end,
 })

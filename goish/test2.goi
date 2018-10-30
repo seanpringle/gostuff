@@ -15,7 +15,7 @@ t = {
 	a = 1,
 	"__*&^" = 2,
 	c = {
-		d = function()
+		d = function
 			return "hello world"
 		end
 	}
@@ -30,7 +30,7 @@ print("", t:keys())
 print(2*2+3)
 
 t = {
-	g = function()
+	g = function
 		return "hello world"
 	end,
 }
@@ -148,5 +148,16 @@ print(0:max(2))
 
 print([2,4,6,8,3]:sort(do(a, b) return a < b end))
 
+print([[a
+`multi`
+line
+string
+]])
 
+print("abc":match("[aeiou]"))
+print("abc":match("[aeiou]"))
 
+function print("hi") end()
+
+print(getprototype(0).huge)
+print(getprototype(1.0).huge)
