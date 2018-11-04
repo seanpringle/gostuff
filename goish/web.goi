@@ -1,4 +1,13 @@
 
+KB = 1024
+MB = KB * 1024
+GB = MB * 1024
+TB = GB * 1024
+
+new = function(p, m)
+	return setprototype(m, p)
+end
+
 services = function
 	api = {}
 	group = sync.group()
@@ -24,36 +33,33 @@ services = function
 	return api
 end()
 
-entity = function
+createNode = function
 
-	id = services.id()
-	blinks = sync.queue()
+	proto = {
 
-	x = 0
-	y = 0
-	move = do(mx, my)
-		x = mx
-		y = my
-	end
-
-	return {
-		blink = function(e)
-			for blinks do(fn)
-				fn(e)
+		blink = do(self)
+			for self.blinks do(fn)
+				fn(self)
 			end
 		end,
 
-		position = function(e)
-			return x, y
-		end,
-
-		move = function(e, x, y)
-			blinks:write(do
-				move(x, y)
+		insert = do(self, dev)
+			self.blinks:write(do
+				self.devices:push(dev)
 			end)
 		end,
 	}
-end
+
+	return do
+		return new(proto, {
+			id = services.id(),
+			blinks = sync.queue(),
+			devices = [],
+		})
+	end
+end()
+
+print(createNode())
 
 play = function(group, inbox)
 

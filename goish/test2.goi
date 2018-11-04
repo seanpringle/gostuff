@@ -161,3 +161,6 @@ function print("hi") end()
 
 print(getprototype(0).huge)
 print(getprototype(1.0).huge)
+
+print([]:extend(3))
+

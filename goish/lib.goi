@@ -69,6 +69,13 @@ function()
 		end
 	end
 
+	p.extend = function(list, size, def)
+		while #list < size do
+			list:push(def)
+		end
+		return list
+	end
+
 	p.set = function(list, pos, val)
 		list\pos = val
 	end

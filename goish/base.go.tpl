@@ -514,14 +514,15 @@ func (t *Map) String() string {
 
 type List struct {
 	data []Any
+	meta Any
 }
 
 func NewList(data []Any) *List {
-	return &List{data: data}
+	return &List{data: data, meta: protoList}
 }
 
 func (t *List) Lib() *Map {
-	return protoList
+	return t.meta.(*Map)
 }
 
 func (s *List) Type() string {
@@ -563,6 +564,25 @@ func (l *List) Get(pos Any) Any {
 		}
 	}
 	return nil
+}
+
+type Record struct {
+	meta Any
+}
+
+func (r Record) Lib() *Map {
+	if r.meta != nil {
+		return r.meta.(*Map)
+	}
+	return protoDef
+}
+
+func (r Record) Type() string {
+	return "record"
+}
+
+func (r Record) String() string {
+	return "record"
 }
 
 type Func func(*VM, *Args) *Args
@@ -704,7 +724,7 @@ func isInt(a Any) (n Int, b bool) {
 }
 
 func toInt(n Int) Any {
-	if n < IntCache {
+	if n >= 0 && n < IntCache {
 		return &SInts[n]
 	}
 	return n
@@ -942,8 +962,8 @@ func find(t Any, key Any) Any {
 
 func field(t Any, key Any) Any {
 	if t != nil {
-		if _, is := t.(*Map); is {
-			return find(t, key)
+		if m, is := t.(*Map); is {
+			return m.Get(key)
 		}
 		if l, is := t.(*List); is {
 			return l.Get(key)
@@ -1101,6 +1121,13 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 		vm.da(aa)
 		aa = vm.ga(1)
 		aa.set(0, m)
+		return aa
+	}
+	if l, is := aa.get(0).(*List); is {
+		l.meta = aa.get(1)
+		vm.da(aa)
+		aa = vm.ga(1)
+		aa.set(0, l)
 		return aa
 	}
 	panic(fmt.Sprintf("cannot set prototype"))
