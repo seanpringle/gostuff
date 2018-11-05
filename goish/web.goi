@@ -33,25 +33,27 @@ services = function
 	return api
 end()
 
-createNode = function
+createNode = function(roles)
 
 	proto = {
 
-		blink = do(self)
+		blink = function(self)
 			for self.blinks do(fn)
 				fn(self)
 			end
 		end,
 
-		insert = do(self, dev)
+		insert = function(self, dev)
 			self.blinks:write(do
 				self.devices:push(dev)
 			end)
 		end,
 	}
 
-	return do
-		return new(proto, {
+	class = (roles or []):shove(proto)
+
+	return function
+		return new(class, {
 			id = services.id(),
 			blinks = sync.queue(),
 			devices = [],

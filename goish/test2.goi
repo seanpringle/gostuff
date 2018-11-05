@@ -164,3 +164,5 @@ print(getprototype(1.0).huge)
 
 print([]:extend(3))
 
+print((1+2)*3)
+print(3*(1+2))

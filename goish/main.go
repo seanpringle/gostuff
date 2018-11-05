@@ -654,21 +654,18 @@ func (p *Parser) expression(block *NodeBlock) Node {
 		}
 	}
 
-	//var last Node
+	var last Node
 
 	for node := p.node(block); node != nil; node = p.node(block) {
 
-		//log.Println(len(items), len(ops), node)
-		//log.Println("\t", items)
-		//log.Println("\t", ops)
+		if ex, is := node.(*NodeExec); is {
+			_, op := last.(Operator)
+			if op || len(items) == 0 {
+				node = ex.args
+			}
+		}
 
-		//if ex, is := node.(*NodeExec); is {
-		//	if _, is := last.(Operator); is {
-		//		node = ex.args
-		//	}
-		//}
-
-		//last = node
+		last = node
 
 		if op, is := node.(Operator); is {
 			shunt(op.Precedence())
