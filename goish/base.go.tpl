@@ -21,8 +21,12 @@ import "regexp"
 
 type Any interface {
 	Type() string
-	Lib() *Map
+	Lib() Library
 	String() string
+}
+
+type Library interface {
+	Find(Any) Any
 }
 
 type VM struct {
@@ -65,7 +69,7 @@ func (aa *Args) String() string {
 	return "args"
 }
 
-func (aa *Args) Lib() *Map {
+func (aa *Args) Lib() Library {
 	return protoDef
 }
 
@@ -163,7 +167,7 @@ func (b Bool) Type() string {
 	return "bool"
 }
 
-func (b Bool) Lib() *Map {
+func (b Bool) Lib() Library {
 	return protoDef
 }
 
@@ -189,7 +193,7 @@ func (s Text) Len() int64 { // characters
 	return l
 }
 
-func (s Text) Lib() *Map {
+func (s Text) Lib() Library {
 	return protoText
 }
 
@@ -207,7 +211,7 @@ func (b Blob) Type() string {
 	return "blob"
 }
 
-func (b Blob) Lib() *Map {
+func (b Blob) Lib() Library {
 	return protoBlob
 }
 
@@ -245,7 +249,7 @@ func (i Int) Type() string {
 	return "int"
 }
 
-func (i Int) Lib() *Map {
+func (i Int) Lib() Library {
 	return protoInt
 }
 
@@ -273,7 +277,7 @@ func (i *SInt) Type() string {
 	return "int"
 }
 
-func (i *SInt) Lib() *Map {
+func (i *SInt) Lib() Library {
 	return protoInt
 }
 
@@ -314,7 +318,7 @@ func (d Dec) Type() string {
 	return "dec"
 }
 
-func (d Dec) Lib() *Map {
+func (d Dec) Lib() Library {
 	return protoDec
 }
 
@@ -336,7 +340,7 @@ func (r Rune) Text() Text {
 	return Text(r.String())
 }
 
-func (r Rune) Lib() *Map {
+func (r Rune) Lib() Library {
 	return protoDef
 }
 
@@ -363,7 +367,7 @@ func (e Status) String() string {
 	return "ok"
 }
 
-func (e Status) Lib() *Map {
+func (e Status) Lib() Library {
 	return protoDef
 }
 
@@ -382,7 +386,7 @@ func (t Instant) String() string {
 	return fmt.Sprintf("%v", time.Time(t))
 }
 
-func (t Instant) Lib() *Map {
+func (t Instant) Lib() Library {
 	return protoInst
 }
 
@@ -408,7 +412,7 @@ func (t Ticker) String() string {
 	return "ticker"
 }
 
-func (t Ticker) Lib() *Map {
+func (t Ticker) Lib() Library {
 	return protoTick
 }
 
@@ -425,7 +429,7 @@ type MapData map[Any]Any
 
 type Map struct {
 	data MapData
-	meta Any
+	meta Library
 }
 
 func NewMap(data MapData) *Map {
@@ -435,7 +439,7 @@ func NewMap(data MapData) *Map {
 	}
 }
 
-func (t *Map) Lib() *Map {
+func (t *Map) Lib() Library {
 	return t
 }
 
@@ -463,21 +467,8 @@ func (t *Map) Find(key Any) Any {
 		if v, ok := t.data[key]; ok {
 			return v
 		}
-		if t.meta != nil {
-			if l, is := t.meta.(*List); is {
-				for _, i := range l.data {
-					if m, is := i.(*Map); is {
-						v := m.Find(key)
-						if v != nil {
-							return v
-						}
-					}
-				}
-			}
-			if mt, is := t.meta.(*Map); is {
-				return mt.Find(key)
-			}
-			return t.meta
+		if lib, is := t.meta.(Library); is {
+			return lib.Find(key)
 		}
 	}
 	return nil
@@ -514,15 +505,15 @@ func (t *Map) String() string {
 
 type List struct {
 	data []Any
-	meta Any
+	meta Library
 }
 
 func NewList(data []Any) *List {
 	return &List{data: data, meta: protoList}
 }
 
-func (t *List) Lib() *Map {
-	return t.meta.(*Map)
+func (t *List) Lib() Library {
+	return t.meta
 }
 
 func (s *List) Type() string {
@@ -566,11 +557,22 @@ func (l *List) Get(pos Any) Any {
 	return nil
 }
 
+func (l *List) Find(key Any) Any {
+	for _, item := range l.data {
+		if lib, is := item.(Library); is {
+			if val := lib.Find(key); val != nil {
+				return val
+			}
+		}
+	}
+	return nil
+}
+
 type Record struct {
 	meta Any
 }
 
-func (r Record) Lib() *Map {
+func (r Record) Lib() Library {
 	if r.meta != nil {
 		return r.meta.(*Map)
 	}
@@ -599,7 +601,7 @@ func (f Func) Type() string {
 	return "func"
 }
 
-func (f Func) Lib() *Map {
+func (f Func) Lib() Library {
 	return protoDef
 }
 
@@ -621,7 +623,7 @@ func (c *Chan) String() string {
 	return "channel"
 }
 
-func (c *Chan) Lib() *Map {
+func (c *Chan) Lib() Library {
 	return protoChan
 }
 
@@ -641,7 +643,7 @@ func (g *Group) String() string {
 	return "group"
 }
 
-func (g *Group) Lib() *Map {
+func (g *Group) Lib() Library {
 	return protoGroup
 }
 
@@ -691,7 +693,7 @@ func (s Stream) Type() string {
 	return "stream"
 }
 
-func (s Stream) Lib() *Map {
+func (s Stream) Lib() Library {
 	return protoStream
 }
 
@@ -1117,14 +1119,14 @@ var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	if m, is := aa.get(0).(*Map); is {
-		m.meta = aa.get(1)
+		m.meta = aa.get(1).(Library)
 		vm.da(aa)
 		aa = vm.ga(1)
 		aa.set(0, m)
 		return aa
 	}
 	if l, is := aa.get(0).(*List); is {
-		l.meta = aa.get(1)
+		l.meta = aa.get(1).(Library)
 		vm.da(aa)
 		aa = vm.ga(1)
 		aa.set(0, l)
@@ -1140,9 +1142,9 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 		return join(vm, protoDef)
 	}
 	if m, is := v.(*Map); is {
-		return join(vm, m.meta)
+		return join(vm, m.meta.(Any))
 	}
-	return join(vm, v.Lib())
+	return join(vm, v.Lib().(Any))
 })
 
 type ReadRuner interface {

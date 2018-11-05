@@ -23,7 +23,7 @@ func (r HttpReq) String() string {
 	return r.Type()
 }
 
-func (r HttpReq) Lib() *Map {
+func (r HttpReq) Lib() Library {
 	return protoHttpReq
 }
 
@@ -39,7 +39,7 @@ func (r WebSock) String() string {
 	return r.Type()
 }
 
-func (r WebSock) Lib() *Map {
+func (r WebSock) Lib() Library {
 	return protoWebSock
 }
 

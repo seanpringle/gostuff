@@ -21,8 +21,12 @@ import "regexp"
 
 type Any interface {
 	Type() string
-	Lib() *Map
+	Lib() Library
 	String() string
+}
+
+type Library interface {
+	Find(Any) Any
 }
 
 type VM struct {
@@ -65,7 +69,7 @@ func (aa *Args) String() string {
 	return "args"
 }
 
-func (aa *Args) Lib() *Map {
+func (aa *Args) Lib() Library {
 	return protoDef
 }
 
@@ -163,7 +167,7 @@ func (b Bool) Type() string {
 	return "bool"
 }
 
-func (b Bool) Lib() *Map {
+func (b Bool) Lib() Library {
 	return protoDef
 }
 
@@ -189,7 +193,7 @@ func (s Text) Len() int64 { // characters
 	return l
 }
 
-func (s Text) Lib() *Map {
+func (s Text) Lib() Library {
 	return protoText
 }
 
@@ -207,7 +211,7 @@ func (b Blob) Type() string {
 	return "blob"
 }
 
-func (b Blob) Lib() *Map {
+func (b Blob) Lib() Library {
 	return protoBlob
 }
 
@@ -245,7 +249,7 @@ func (i Int) Type() string {
 	return "int"
 }
 
-func (i Int) Lib() *Map {
+func (i Int) Lib() Library {
 	return protoInt
 }
 
@@ -273,7 +277,7 @@ func (i *SInt) Type() string {
 	return "int"
 }
 
-func (i *SInt) Lib() *Map {
+func (i *SInt) Lib() Library {
 	return protoInt
 }
 
@@ -314,7 +318,7 @@ func (d Dec) Type() string {
 	return "dec"
 }
 
-func (d Dec) Lib() *Map {
+func (d Dec) Lib() Library {
 	return protoDec
 }
 
@@ -336,7 +340,7 @@ func (r Rune) Text() Text {
 	return Text(r.String())
 }
 
-func (r Rune) Lib() *Map {
+func (r Rune) Lib() Library {
 	return protoDef
 }
 
@@ -363,7 +367,7 @@ func (e Status) String() string {
 	return "ok"
 }
 
-func (e Status) Lib() *Map {
+func (e Status) Lib() Library {
 	return protoDef
 }
 
@@ -382,7 +386,7 @@ func (t Instant) String() string {
 	return fmt.Sprintf("%v", time.Time(t))
 }
 
-func (t Instant) Lib() *Map {
+func (t Instant) Lib() Library {
 	return protoInst
 }
 
@@ -408,7 +412,7 @@ func (t Ticker) String() string {
 	return "ticker"
 }
 
-func (t Ticker) Lib() *Map {
+func (t Ticker) Lib() Library {
 	return protoTick
 }
 
@@ -425,7 +429,7 @@ type MapData map[Any]Any
 
 type Map struct {
 	data MapData
-	meta Any
+	meta Library
 }
 
 func NewMap(data MapData) *Map {
@@ -435,7 +439,7 @@ func NewMap(data MapData) *Map {
 	}
 }
 
-func (t *Map) Lib() *Map {
+func (t *Map) Lib() Library {
 	return t
 }
 
@@ -463,21 +467,8 @@ func (t *Map) Find(key Any) Any {
 		if v, ok := t.data[key]; ok {
 			return v
 		}
-		if t.meta != nil {
-			if l, is := t.meta.(*List); is {
-				for _, i := range l.data {
-					if m, is := i.(*Map); is {
-						v := m.Find(key)
-						if v != nil {
-							return v
-						}
-					}
-				}
-			}
-			if mt, is := t.meta.(*Map); is {
-				return mt.Find(key)
-			}
-			return t.meta
+		if lib, is := t.meta.(Library); is {
+			return lib.Find(key)
 		}
 	}
 	return nil
@@ -514,15 +505,15 @@ func (t *Map) String() string {
 
 type List struct {
 	data []Any
-	meta Any
+	meta Library
 }
 
 func NewList(data []Any) *List {
 	return &List{data: data, meta: protoList}
 }
 
-func (t *List) Lib() *Map {
-	return t.meta.(*Map)
+func (t *List) Lib() Library {
+	return t.meta
 }
 
 func (s *List) Type() string {
@@ -566,11 +557,22 @@ func (l *List) Get(pos Any) Any {
 	return nil
 }
 
+func (l *List) Find(key Any) Any {
+	for _, item := range l.data {
+		if lib, is := item.(Library); is {
+			if val := lib.Find(key); val != nil {
+				return val
+			}
+		}
+	}
+	return nil
+}
+
 type Record struct {
 	meta Any
 }
 
-func (r Record) Lib() *Map {
+func (r Record) Lib() Library {
 	if r.meta != nil {
 		return r.meta.(*Map)
 	}
@@ -599,7 +601,7 @@ func (f Func) Type() string {
 	return "func"
 }
 
-func (f Func) Lib() *Map {
+func (f Func) Lib() Library {
 	return protoDef
 }
 
@@ -621,7 +623,7 @@ func (c *Chan) String() string {
 	return "channel"
 }
 
-func (c *Chan) Lib() *Map {
+func (c *Chan) Lib() Library {
 	return protoChan
 }
 
@@ -641,7 +643,7 @@ func (g *Group) String() string {
 	return "group"
 }
 
-func (g *Group) Lib() *Map {
+func (g *Group) Lib() Library {
 	return protoGroup
 }
 
@@ -691,7 +693,7 @@ func (s Stream) Type() string {
 	return "stream"
 }
 
-func (s Stream) Lib() *Map {
+func (s Stream) Lib() Library {
 	return protoStream
 }
 
@@ -1117,14 +1119,14 @@ var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 	if m, is := aa.get(0).(*Map); is {
-		m.meta = aa.get(1)
+		m.meta = aa.get(1).(Library)
 		vm.da(aa)
 		aa = vm.ga(1)
 		aa.set(0, m)
 		return aa
 	}
 	if l, is := aa.get(0).(*List); is {
-		l.meta = aa.get(1)
+		l.meta = aa.get(1).(Library)
 		vm.da(aa)
 		aa = vm.ga(1)
 		aa.set(0, l)
@@ -1140,9 +1142,9 @@ var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 		return join(vm, protoDef)
 	}
 	if m, is := v.(*Map); is {
-		return join(vm, m.meta)
+		return join(vm, m.meta.(Any))
 	}
-	return join(vm, v.Lib())
+	return join(vm, v.Lib().(Any))
 })
 
 type ReadRuner interface {
@@ -1514,47 +1516,47 @@ func init() {
 	protoStream.meta = protoDef
 }
 
-const S8 Text = Text("push")
-const S9 Text = Text("extend")
-const S13 Text = Text("ticker")
-const S20 Text = Text("channel")
-const S30 Text = Text("id")
-const S7 Text = Text("min")
-const S11 Text = Text("get")
-const S12 Text = Text("keys")
-const S15 Text = Text("read")
-const S1 Text = Text("stdin")
-const S21 Text = Text("queue")
-const S27 Text = Text("close")
-const S4 Text = Text("len")
 const S6 Text = Text("max")
-const S22 Text = Text("readrune")
-const S25 Text = Text("open")
-const S36 Text = Text("devices")
-const S14 Text = Text("stop")
-const S28 Text = Text("slurp")
-const S29 Text = Text("group")
-const S31 Text = Text("run")
-const S32 Text = Text("wait")
+const S7 Text = Text("min")
+const S12 Text = Text("keys")
+const S20 Text = Text("channel")
+const S21 Text = Text("queue")
 const S33 Text = Text("blink")
-const S19 Text = Text("shift")
-const S26 Text = Text("readall")
-const S34 Text = Text("blinks")
-const S35 Text = Text("insert")
-const S40 Text = Text("websocket")
-const S41 Text = Text("text")
-const S3 Text = Text("type")
-const S10 Text = Text("set")
-const S16 Text = Text("lock")
 const S17 Text = Text("write")
-const S23 Text = Text("join")
+const S25 Text = Text("open")
+const S29 Text = Text("group")
+const S10 Text = Text("set")
+const S18 Text = Text("jobs")
+const S28 Text = Text("slurp")
 const S38 Text = Text("json")
 const S39 Text = Text("serve")
 const S2 Text = Text("pop")
+const S3 Text = Text("type")
 const S5 Text = Text("iterate")
-const S18 Text = Text("jobs")
+const S13 Text = Text("ticker")
+const S30 Text = Text("id")
+const S31 Text = Text("run")
+const S15 Text = Text("read")
+const S36 Text = Text("devices")
+const S1 Text = Text("stdin")
+const S8 Text = Text("push")
+const S22 Text = Text("readrune")
+const S26 Text = Text("readall")
+const S9 Text = Text("extend")
+const S11 Text = Text("get")
+const S23 Text = Text("join")
 const S24 Text = Text("readline")
+const S35 Text = Text("insert")
+const S41 Text = Text("text")
 const S37 Text = Text("shove")
+const S4 Text = Text("len")
+const S14 Text = Text("stop")
+const S16 Text = Text("lock")
+const S19 Text = Text("shift")
+const S27 Text = Text("close")
+const S32 Text = Text("wait")
+const S34 Text = Text("blinks")
+const S40 Text = Text("websocket")
 
 func main() {
 
@@ -1574,40 +1576,40 @@ func main() {
 	vm := &VM{}
 
 	{
-		var Ntrue Any
-		noop(Ntrue)
-		var Ninteger Any
-		noop(Ninteger)
-		var Nmap Any
-		noop(Nmap)
-		var Nfalse Any
-		noop(Nfalse)
-		var NKB Any
-		noop(NKB)
-		var Ndecimal Any
-		noop(Ndecimal)
 		var Nnew Any
 		noop(Nnew)
-		var Nservices Any
-		noop(Nservices)
-		var NcreateNode Any
-		noop(NcreateNode)
 		var Nplay Any
 		noop(Nplay)
-		var NGB Any
-		noop(NGB)
-		var NTB Any
-		noop(NTB)
 		var Nsuper Any
 		noop(Nsuper)
-		var Nstring Any
-		noop(Nstring)
+		var Ndecimal Any
+		noop(Ndecimal)
 		var Nlist Any
 		noop(Nlist)
 		var Nstream Any
 		noop(Nstream)
+		var NTB Any
+		noop(NTB)
+		var Ntrue Any
+		noop(Ntrue)
 		var Nnil Any
 		noop(Nnil)
+		var NGB Any
+		noop(NGB)
+		var Nstring Any
+		noop(Nstring)
+		var Nfalse Any
+		noop(Nfalse)
+		var Nservices Any
+		noop(Nservices)
+		var NcreateNode Any
+		noop(NcreateNode)
+		var Ninteger Any
+		noop(Ninteger)
+		var Nmap Any
+		noop(Nmap)
+		var NKB Any
+		noop(NKB)
 		var NMB Any
 		noop(NMB)
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Nsuper = a; return a }()
@@ -2299,8 +2301,8 @@ func main() {
 						vm.da(aa)
 						{
 							return join(vm, call(vm, Nsetprototype, join(vm, NewMap(MapData{
-								S18 /* jobs */ : one(vm, NewList([]Any{})),
-								S16 /* lock */ : one(vm, call(vm, find(Nsync, S20 /* channel */), join(vm, Int(1))))}), NprotoQueue)))
+								S16 /* lock */ : one(vm, call(vm, find(Nsync, S20 /* channel */), join(vm, Int(1)))),
+								S18 /* jobs */ : one(vm, NewList([]Any{}))}), NprotoQueue)))
 						}
 						return nil
 					}))
@@ -2427,12 +2429,12 @@ func main() {
 						noop(Npath)
 						vm.da(aa)
 						{
+							var Nfile Any
+							noop(Nfile)
 							var Ncontent Any
 							noop(Ncontent)
 							var Nok Any
 							noop(Nok)
-							var Nfile Any
-							noop(Nfile)
 							if truth(one(vm, func() *Args {
 								aa := join(vm, call(vm, find(Nio, S25 /* open */), join(vm, Npath, Text("r"))))
 								Nok = aa.get(0)
@@ -2527,12 +2529,12 @@ func main() {
 			a := one(vm, call(vm, Func(func(vm *VM, aa *Args) *Args {
 				vm.da(aa)
 				{
-					var Napi Any
-					noop(Napi)
 					var Ngroup Any
 					noop(Ngroup)
 					var Nseq Any
 					noop(Nseq)
+					var Napi Any
+					noop(Napi)
 					func() Any {
 						a := one(vm, NewMap(MapData{}))
 						Napi = a
@@ -2615,10 +2617,10 @@ func main() {
 				noop(Nroles)
 				vm.da(aa)
 				{
-					var Nclass Any
-					noop(Nclass)
 					var Nproto Any
 					noop(Nproto)
+					var Nclass Any
+					noop(Nclass)
 					func() Any {
 						a := one(vm, NewMap(MapData{
 							S33 /* blink */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -2822,12 +2824,12 @@ func main() {
 								return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
 									vm.da(aa)
 									{
+										var Nmsg Any
+										noop(Nmsg)
 										var Ntry Any
 										noop(Ntry)
 										var Nmode Any
 										noop(Nmode)
-										var Nmsg Any
-										noop(Nmsg)
 										loop(func() {
 											for truth(one(vm, func() *Args {
 												aa := join(vm, func() *Args {
