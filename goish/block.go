@@ -36,7 +36,7 @@ func (nb *NodeBlock) Define(v *NodeVar) {
 	if scope == nil {
 		panic("missing scope")
 	}
-	scope[v.Format()] = v
+	scope[v.name.Format()] = v
 }
 
 func (nb *NodeBlock) Format() string {

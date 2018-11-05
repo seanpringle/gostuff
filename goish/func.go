@@ -24,6 +24,14 @@ func (nf *NodeFunc) Format() string {
 		init = append(init, fmt.Sprintf("%s := aa.get(%d); noop(%s)", arg.(*NodeName).Format(), i, arg.(*NodeName).Format()))
 	}
 
+	if b, is := nf.body.(*NodeBlock); is {
+		for _, arg := range nf.args {
+			if b.scope != nil {
+				delete(b.scope, arg.(*NodeName).Format())
+			}
+		}
+	}
+
 	//return fmt.Sprintf("Func(func(aa Tup) Tup { %s; return func() Tup { %s; return Tup{nil}; }() })",
 	return fmt.Sprintf("Func(func(vm *VM, aa *Args) *Args { %s; vm.da(aa); %s; return nil })",
 		strings.Join(init, ";"),

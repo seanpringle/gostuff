@@ -256,7 +256,11 @@ func (p *Parser) node(block *NodeBlock) Node {
 	for p.scan() == '-' && p.char(1) == '-' {
 		p.take()
 		p.take()
-		for c := p.take(); c != rune(0) && c != '\n'; c = p.take() {
+		if p.char(0) == '[' && p.char(1) == '[' {
+			p.node(nil)
+		} else {
+			for c := p.take(); c != rune(0) && c != '\n'; c = p.take() {
+			}
 		}
 	}
 

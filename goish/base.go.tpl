@@ -21,12 +21,16 @@ import "regexp"
 
 type Any interface {
 	Type() string
-	Lib() Library
+	Lib() Searchable
 	String() string
 }
 
-type Library interface {
-	Find(Any) Any
+type Searchable interface {
+	Search(Any) Any
+}
+
+type Linkable interface {
+	Link(Searchable)
 }
 
 type VM struct {
@@ -69,7 +73,7 @@ func (aa *Args) String() string {
 	return "args"
 }
 
-func (aa *Args) Lib() Library {
+func (aa *Args) Lib() Searchable {
 	return protoDef
 }
 
@@ -167,7 +171,7 @@ func (b Bool) Type() string {
 	return "bool"
 }
 
-func (b Bool) Lib() Library {
+func (b Bool) Lib() Searchable {
 	return protoDef
 }
 
@@ -193,7 +197,7 @@ func (s Text) Len() int64 { // characters
 	return l
 }
 
-func (s Text) Lib() Library {
+func (s Text) Lib() Searchable {
 	return protoText
 }
 
@@ -211,7 +215,7 @@ func (b Blob) Type() string {
 	return "blob"
 }
 
-func (b Blob) Lib() Library {
+func (b Blob) Lib() Searchable {
 	return protoBlob
 }
 
@@ -249,7 +253,7 @@ func (i Int) Type() string {
 	return "int"
 }
 
-func (i Int) Lib() Library {
+func (i Int) Lib() Searchable {
 	return protoInt
 }
 
@@ -277,7 +281,7 @@ func (i *SInt) Type() string {
 	return "int"
 }
 
-func (i *SInt) Lib() Library {
+func (i *SInt) Lib() Searchable {
 	return protoInt
 }
 
@@ -318,7 +322,7 @@ func (d Dec) Type() string {
 	return "dec"
 }
 
-func (d Dec) Lib() Library {
+func (d Dec) Lib() Searchable {
 	return protoDec
 }
 
@@ -340,7 +344,7 @@ func (r Rune) Text() Text {
 	return Text(r.String())
 }
 
-func (r Rune) Lib() Library {
+func (r Rune) Lib() Searchable {
 	return protoDef
 }
 
@@ -367,7 +371,7 @@ func (e Status) String() string {
 	return "ok"
 }
 
-func (e Status) Lib() Library {
+func (e Status) Lib() Searchable {
 	return protoDef
 }
 
@@ -386,7 +390,7 @@ func (t Instant) String() string {
 	return fmt.Sprintf("%v", time.Time(t))
 }
 
-func (t Instant) Lib() Library {
+func (t Instant) Lib() Searchable {
 	return protoInst
 }
 
@@ -412,7 +416,7 @@ func (t Ticker) String() string {
 	return "ticker"
 }
 
-func (t Ticker) Lib() Library {
+func (t Ticker) Lib() Searchable {
 	return protoTick
 }
 
@@ -429,7 +433,7 @@ type MapData map[Any]Any
 
 type Map struct {
 	data MapData
-	meta Library
+	meta Searchable
 }
 
 func NewMap(data MapData) *Map {
@@ -439,8 +443,12 @@ func NewMap(data MapData) *Map {
 	}
 }
 
-func (t *Map) Lib() Library {
+func (t *Map) Lib() Searchable {
 	return t
+}
+
+func (t *Map) Link(lib Searchable) {
+	t.meta = lib
 }
 
 func (t *Map) Get(key Any) Any {
@@ -462,13 +470,13 @@ func (t *Map) Set(key Any, val Any) {
 	}
 }
 
-func (t *Map) Find(key Any) Any {
+func (t *Map) Search(key Any) Any {
 	if t != nil {
 		if v, ok := t.data[key]; ok {
 			return v
 		}
-		if lib, is := t.meta.(Library); is {
-			return lib.Find(key)
+		if t.meta != nil {
+			return t.meta.Search(key)
 		}
 	}
 	return nil
@@ -485,15 +493,19 @@ func (t *Map) Len() int64 {
 	return 0
 }
 
+func (t *Map) Bool() Bool {
+	return Bool(t.Len() > 0)
+}
+
 func (t *Map) String() string {
 	if t != nil {
 		pairs := []string{}
 		for k, v := range t.data {
 			if _, is := v.(*Map); is {
-				v = Text("map")
+				v = Text(v.Type())
 			}
 			if _, is := v.(*List); is {
-				v = Text("list")
+				v = Text(v.Type())
 			}
 			//pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
 			pairs = append(pairs, fmt.Sprintf("%s = %s", tostring(k), tostring(v)))
@@ -505,33 +517,41 @@ func (t *Map) String() string {
 
 type List struct {
 	data []Any
-	meta Library
+	meta Searchable
 }
 
 func NewList(data []Any) *List {
 	return &List{data: data, meta: protoList}
 }
 
-func (t *List) Lib() Library {
+func (t *List) Lib() Searchable {
 	return t.meta
 }
 
-func (s *List) Type() string {
+func (l *List) Link(lib Searchable) {
+	l.meta = lib
+}
+
+func (l *List) Type() string {
 	return "list"
 }
 
-func (s *List) Len() int64 {
-	return int64(len(s.data))
+func (l *List) Len() int64 {
+	return int64(len(l.data))
+}
+
+func (l *List) Bool() Bool {
+	return Bool(len(l.data) > 0)
 }
 
 func (s *List) String() string {
 	items := []string{}
 	for _, v := range s.data {
 		if _, is := v.(*Map); is {
-			v = Text("map")
+			v = Text(v.Type())
 		}
 		if _, is := v.(*List); is {
-			v = Text("list")
+			v = Text(v.Type())
 		}
 		items = append(items, tostring(v))
 	}
@@ -557,34 +577,15 @@ func (l *List) Get(pos Any) Any {
 	return nil
 }
 
-func (l *List) Find(key Any) Any {
+func (l *List) Search(key Any) Any {
 	for _, item := range l.data {
-		if lib, is := item.(Library); is {
-			if val := lib.Find(key); val != nil {
+		if lib, is := item.(Searchable); is {
+			if val := lib.Search(key); val != nil {
 				return val
 			}
 		}
 	}
 	return nil
-}
-
-type Record struct {
-	meta Any
-}
-
-func (r Record) Lib() Library {
-	if r.meta != nil {
-		return r.meta.(*Map)
-	}
-	return protoDef
-}
-
-func (r Record) Type() string {
-	return "record"
-}
-
-func (r Record) String() string {
-	return "record"
 }
 
 type Func func(*VM, *Args) *Args
@@ -601,8 +602,13 @@ func (f Func) Type() string {
 	return "func"
 }
 
-func (f Func) Lib() Library {
+func (f Func) Lib() Searchable {
 	return protoDef
+}
+
+func (f Func) Search(key Any) Any {
+	vm := &VM{}
+	return one(vm, call(vm, f, join(vm, key)))
 }
 
 type Chan struct {
@@ -623,7 +629,7 @@ func (c *Chan) String() string {
 	return "channel"
 }
 
-func (c *Chan) Lib() Library {
+func (c *Chan) Lib() Searchable {
 	return protoChan
 }
 
@@ -643,7 +649,7 @@ func (g *Group) String() string {
 	return "group"
 }
 
-func (g *Group) Lib() Library {
+func (g *Group) Lib() Searchable {
 	return protoGroup
 }
 
@@ -693,7 +699,7 @@ func (s Stream) Type() string {
 	return "stream"
 }
 
-func (s Stream) Lib() Library {
+func (s Stream) Lib() Searchable {
 	return protoStream
 }
 
@@ -955,9 +961,9 @@ func call(vm *VM, f Any, aa *Args) *Args {
 
 func find(t Any, key Any) Any {
 	if t != nil {
-		return t.Lib().Find(key)
+		return t.Lib().Search(key)
 	} else {
-		return protoDef.Find(key)
+		return protoDef.Search(key)
 	}
 	return nil
 }
@@ -1118,18 +1124,11 @@ var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
 })
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
-	if m, is := aa.get(0).(*Map); is {
-		m.meta = aa.get(1).(Library)
+	if l, is := aa.get(0).(Searchable); is {
+		l.(Linkable).Link(aa.get(1).(Searchable))
 		vm.da(aa)
 		aa = vm.ga(1)
-		aa.set(0, m)
-		return aa
-	}
-	if l, is := aa.get(0).(*List); is {
-		l.meta = aa.get(1).(Library)
-		vm.da(aa)
-		aa = vm.ga(1)
-		aa.set(0, l)
+		aa.set(0, l.(Any))
 		return aa
 	}
 	panic(fmt.Sprintf("cannot set prototype"))

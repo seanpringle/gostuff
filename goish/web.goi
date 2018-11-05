@@ -4,10 +4,6 @@ MB = KB * 1024
 GB = MB * 1024
 TB = GB * 1024
 
-new = function(p, m)
-	return setprototype(m, p)
-end
-
 services = function
 	api = {}
 	group = sync.group()
@@ -33,35 +29,46 @@ services = function
 	return api
 end()
 
-createNode = function(roles)
+core = {
+	init = function(self)
+		self.id = services.id()
+		self.todo = sync.queue()
+	end,
 
-	proto = {
+	jobs = function(self)
+		for self.todo do(fn)
+			fn(self)
+		end
+	end,
 
-		blink = function(self)
-			for self.blinks do(fn)
-				fn(self)
-			end
-		end,
-
-		insert = function(self, dev)
-			self.blinks:write(do
-				self.devices:push(dev)
-			end)
-		end,
-	}
-
-	class = (roles or []):shove(proto)
-
-	return function
-		return new(class, {
-			id = services.id(),
-			blinks = sync.queue(),
-			devices = [],
-		})
+	job = function(self, fn)
+		self.todo:write(fn)
 	end
-end()
+}
 
-print(createNode())
+chassis = {
+	init = function(self)
+		self.devices = []
+	end,
+
+	insert = function(self, dev)
+		self.job(do
+			self.devices:push(dev)
+		end)
+	end,
+}
+
+create = function(roles)
+
+	roles = (roles or []):shove(core)
+	node = setprototype({}, roles)
+
+	for roles do(i, role)
+		role.init(node)
+	end
+
+	return node
+end
 
 play = function(group, inbox)
 
