@@ -112,9 +112,9 @@ for { tom = 1, dick = 2, harry = 43 } function(k, v)
 end
 
 a = 1
-print(a++)
-print(a++)
-print(a++)
+print(a=a+1)
+print(a=a+1)
+print(a=a+1)
 
 for 10 do(i)
 	if i == 5 then

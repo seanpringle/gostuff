@@ -21,7 +21,7 @@ services = function
 	group:run(function
 		n = 1
 		while seq:write(n) do
-			n++
+			n = n+1
 		end
 	end)
 
@@ -109,7 +109,7 @@ end()
 starnix = {
 
 	init = function(self)
-		services.log(self.id, "boot")
+		self:log("boot")
 
 		self.processes = {
 

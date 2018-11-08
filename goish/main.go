@@ -358,12 +358,6 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeAnd()
 	}
 
-	if p.scan() == '+' && p.char(1) == '+' {
-		p.take()
-		p.take()
-		return NewNodeInc()
-	}
-
 	if p.scan() == '+' {
 		p.take()
 		return NewNodeAdd()

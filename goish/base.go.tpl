@@ -595,7 +595,7 @@ func (s *List) String() string {
 func (l *List) Set(pos Any, val Any) {
 	if l != nil {
 		n := int64(pos.(IntIsh).Int())
-		if int64(len(l.data)) > n {
+		if n >= 0 && int64(len(l.data)) > n {
 			l.data[n] = val
 		}
 	}
@@ -604,7 +604,7 @@ func (l *List) Set(pos Any, val Any) {
 func (l *List) Get(pos Any) Any {
 	if l != nil {
 		n := int64(pos.(IntIsh).Int())
-		if int64(len(l.data)) > n {
+		if n >= 0 && int64(len(l.data)) > n {
 			return l.data[n]
 		}
 	}
@@ -1154,7 +1154,7 @@ var Nsync *Map
 var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	v := aa.get(0)
 	vm.da(aa)
-	if aa != nil {
+	if v != nil {
 		return join(vm, Text(v.Type()))
 	}
 	return join(vm, Text("nil"))
@@ -1244,6 +1244,7 @@ func init() {
 		}),
 	})
 	protoMap.meta = protoDef
+
 	protoList = NewMap(MapData{
 		Text("insert"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
@@ -1293,6 +1294,7 @@ func init() {
 		}),
 	})
 	protoList.meta = protoDef
+
 	protoChan = NewMap(MapData{
 		Text("read"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)

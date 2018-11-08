@@ -9,6 +9,18 @@ true    = 0 < 1
 false   = 1 < 0
 nil     = []:remove(0)
 
+print = function(a...)
+	for a do(i, v)
+		s = v:string()
+		if type(s) <> "text" then
+			s = super.string(v)
+		end
+		a\i = s
+	end
+	io.stdout:write(a:join("\t").."\n")
+	io.stdout:flush()
+end
+
 function()
 	p = super
 
@@ -29,7 +41,8 @@ function()
 		i = 0
 		return do
 			if i < limit then
-				return i++
+				n, i = i, i+1
+				return n
 			end
 		end
 	end
@@ -80,7 +93,8 @@ function()
 		i = 0
 		return do
 			if i < #list then
-				return i, list\i++
+				n, i = i, i+1
+				return n, list\n
 			end
 		end
 	end
@@ -118,7 +132,8 @@ function()
 		keys = m:keys()
 		return do
 			if i < #keys then
-				key = keys\i++
+				n, i = i, i+1
+				key = keys\n
 				return key, m\key
 			end
 		end
@@ -150,7 +165,8 @@ function()
 	tick.iterate = function(t)
 		i = 0
 		return do
-			return i++, t:read()
+			n, i = i, i+1
+			return n, t:read()
 		end
 	end
 
