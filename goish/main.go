@@ -278,6 +278,13 @@ func (p *Parser) node(block *NodeBlock) Node {
 
 	str := []rune{}
 
+	if p.scan() == '.' && p.char(1) == '.' && p.char(2) == '.' {
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeExtract()
+	}
+
 	if p.scan() == '.' && p.char(1) == '.' {
 		p.take()
 		p.take()
@@ -299,21 +306,23 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeField()
 	}
 
-	if p.scan() == '!' || p.peek("not") {
-		if p.scan() == '!' {
-			p.take()
-		} else {
-			p.take()
-			p.take()
-			p.take()
-		}
-		return NewNodeNot(p.node(block))
+	if p.peek("not") {
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeNot(p.tuple(block, nil))
 	}
 
 	if p.scan() == '=' && p.char(1) == '=' {
 		p.take()
 		p.take()
 		return NewNodeEq()
+	}
+
+	if (p.scan() == '!' && p.char(1) == '=') || (p.scan() == '<' && p.char(1) == '>') {
+		p.take()
+		p.take()
+		return NewNodeNe()
 	}
 
 	if p.scan() == '<' && p.char(1) == '=' {
@@ -395,19 +404,42 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeReturn(p.tuple(block, nil))
 	}
 
-	if p.peek("do") {
-		p.take()
-		p.take()
+	argList := func() Nodes {
 		var args Nodes
 		if p.scan() == '(' {
 			p.take()
-			argTup := p.tuple(block, nil)
-			if argTup != nil {
-				args = Nodes(argTup.(NodeTuple))
+			for {
+				if p.scan() == ',' {
+					p.take()
+					continue
+				}
+				if p.scan() == ')' {
+					break
+				}
+				ensure(p.isname(p.scan()), "expected argument name (func/do)")
+				str = []rune{}
+				for p.isname(p.next()) {
+					str = append(str, p.take())
+				}
+				if p.char(0) == '.' && p.char(1) == '.' && p.char(2) == '.' {
+					p.take()
+					p.take()
+					p.take()
+					args = append(args, NewNodeNameAgg(string(str)))
+				} else {
+					args = append(args, NewNodeName(string(str)))
+				}
 			}
-			ensure(p.scan() == ')', "expected closing paren (do)")
+			ensure(p.scan() == ')', "expected closing paren (func/do)")
 			p.take()
 		}
+		return args
+	}
+
+	if p.peek("do") {
+		p.take()
+		p.take()
+		args := argList()
 		body := p.block(block, nil, nil).(*NodeBlock)
 		ensure(p.peek("end"), "expected: end (do)")
 		p.take()
@@ -425,16 +457,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		p.take()
 		p.take()
-		var args Nodes
-		if p.scan() == '(' {
-			p.take()
-			argTup := p.tuple(block, nil)
-			if argTup != nil {
-				args = Nodes(argTup.(NodeTuple))
-			}
-			ensure(p.scan() == ')', "expected closing paren (func)")
-			p.take()
-		}
+		args := argList()
 		body := p.block(block, Scope{}, nil).(*NodeBlock)
 		ensure(p.peek("end"), "expected: end (function)")
 		p.take()

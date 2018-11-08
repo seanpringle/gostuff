@@ -7,7 +7,7 @@ map     = getprototype({})
 stream  = getprototype(io.stdin)
 true    = 0 < 1
 false   = 1 < 0
-nil     = []:pop()
+nil     = []:remove(0)
 
 function()
 	p = super
@@ -59,6 +59,22 @@ end()
 
 function()
 	p = list
+
+	p.push = function(list, val)
+		return list:insert(#list, val)
+	end
+
+	p.pop = function(list)
+		return list:remove(#list-1)
+	end
+
+	p.shove = function(list, val)
+		return list:insert(0, val)
+	end
+
+	p.shift = function(list)
+		return list:remove(0)
+	end
 
 	p.iterate = function(list)
 		i = 0

@@ -25,7 +25,7 @@ func (no *NodeField) Produces() int {
 }
 
 func (no *NodeField) Precedence() int {
-	return 8
+	return 7
 }
 
 func (no *NodeField) Format() string {

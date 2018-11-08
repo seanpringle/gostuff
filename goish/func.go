@@ -21,13 +21,17 @@ func (nf *NodeFunc) Format() string {
 
 	init := []string{}
 	for i, arg := range nf.args {
+		if agg, is := arg.(*NodeNameAgg); is {
+			init = append(init, fmt.Sprintf("%s := aa.agg(%d); noop(%s)", agg.Format(), i, agg.Format()))
+			break
+		}
 		init = append(init, fmt.Sprintf("%s := aa.get(%d); noop(%s)", arg.(*NodeName).Format(), i, arg.(*NodeName).Format()))
 	}
 
 	if b, is := nf.body.(*NodeBlock); is {
 		for _, arg := range nf.args {
 			if b.scope != nil {
-				delete(b.scope, arg.(*NodeName).Format())
+				delete(b.scope, arg.Format())
 			}
 		}
 	}

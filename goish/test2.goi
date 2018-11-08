@@ -63,6 +63,7 @@ l = [1, 2, 3]
 print(l)
 l:push(4)
 print(l)
+print(getprototype(l))
 print(l:pop())
 print(l)
 
@@ -175,3 +176,25 @@ line
 comment
 ]]
 
+print([1,2,3]:insert(1, 7))
+print([1,2,3]:insert(0, 7))
+print([1,2,3]:insert(4, 7))
+print([1,2,3]:remove(0))
+print([1,2,3]:remove(1))
+print([1,2,3]:remove(3))
+l = [1,2,3]
+print(l:remove(2), l)
+
+a = { b = [ 1, 2, 3 ] }
+
+print(#a)
+
+if (a = { b = 1 }) and a.b == 1 then
+	print("yes")
+end
+
+f = function(a...)
+	print(a)
+end
+
+print([1,2,3]...)

@@ -87,6 +87,18 @@ func (aa *Args) get(i int) Any {
 	return nil
 }
 
+func (aa *Args) agg(i int) Any {
+	if i >= 32 {
+		panic("maximum of 32 arguments per call")
+	}
+	l := []Any{}
+	for aa != nil && i < 32 && (1<<uint(i))&aa.used != 0 {
+		l = append(l, aa.cells[i])
+		i++
+	}
+	return NewList(l)
+}
+
 func (aa *Args) set(i int, v Any) {
 	if i >= 32 {
 		panic("maximum of 32 arguments per call")
@@ -265,6 +277,10 @@ func (i Int) Dec() Dec {
 	return Dec(float64(int64(i)))
 }
 
+func (i Int) Text() Text {
+	return Text(i.String())
+}
+
 type SInt struct {
 	i Int
 }
@@ -291,6 +307,10 @@ func (i *SInt) Bool() Bool {
 
 func (i *SInt) Dec() Dec {
 	return Dec(float64(int64(i.i)))
+}
+
+func (i *SInt) Text() Text {
+	return Text(i.String())
 }
 
 const IntCache = 4096
@@ -324,6 +344,10 @@ func (d Dec) Type() string {
 
 func (d Dec) Lib() Searchable {
 	return protoDec
+}
+
+func (d Dec) Text() Text {
+	return Text(d.String())
 }
 
 type Rune rune
@@ -462,11 +486,21 @@ func (t *Map) Get(key Any) Any {
 
 func (t *Map) Set(key Any, val Any) {
 	if t != nil {
-		if val == nil {
-			delete(t.data, key)
-		} else {
-			t.data[key] = val
-		}
+		t.data[key] = val
+	}
+}
+
+func (t *Map) Has(key Any) Any {
+	if t != nil {
+		_, has := t.data[key]
+		return Bool(has)
+	}
+	return Bool(false)
+}
+
+func (t *Map) Drop(key Any) {
+	if t != nil {
+		delete(t.data, key)
 	}
 }
 
@@ -1026,6 +1060,18 @@ func loop(fn func()) {
 	fn()
 }
 
+func extract(vm *VM, src Any) *Args {
+	if src != nil {
+		l := src.(*List).data
+		aa := vm.ga(len(l))
+		for i, v := range l {
+			aa.set(i, v)
+		}
+		return aa
+	}
+	return nil
+}
+
 func trymethod(t Any, k string, def Any) Any {
 	t, m := method(t, Text(k))
 	if m != nil {
@@ -1199,39 +1245,31 @@ func init() {
 	})
 	protoMap.meta = protoDef
 	protoList = NewMap(MapData{
-		Text("push"): Func(func(vm *VM, aa *Args) *Args {
+		Text("insert"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
-			v := aa.get(1)
+			p := int(aa.get(1).(IntIsh).Int())
+			v := aa.get(2)
 			vm.da(aa)
-			l.data = append(l.data, v)
+			if p >= len(l.data) {
+				l.data = append(l.data, v)
+				return join(vm, l)
+			}
+			if p <= 0 {
+				l.data = append([]Any{v}, l.data...)
+				return join(vm, l)
+			}
+			l.data = append(l.data[0:p], append([]Any{v}, l.data[p:]...)...)
 			return join(vm, l)
 		}),
-		Text("pop"): Func(func(vm *VM, aa *Args) *Args {
+		Text("remove"): Func(func(vm *VM, aa *Args) *Args {
 			l := aa.get(0).(*List)
-			n := len(l.data) - 1
+			p := int(aa.get(1).(IntIsh).Int())
 			vm.da(aa)
-			var v Any
-			if len(l.data) < n {
-				v = l.data[n]
-				l.data = l.data[0:n]
+			if p >= len(l.data) || p < 0 {
+				return join(vm, nil)
 			}
-			return join(vm, v)
-		}),
-		Text("shove"): Func(func(vm *VM, aa *Args) *Args {
-			l := aa.get(0).(*List)
-			v := aa.get(1)
-			vm.da(aa)
-			l.data = append([]Any{v}, l.data...)
-			return join(vm, l)
-		}),
-		Text("shift"): Func(func(vm *VM, aa *Args) *Args {
-			l := aa.get(0).(*List)
-			vm.da(aa)
-			var v Any
-			if len(l.data) > 0 {
-				v = l.data[0]
-				l.data = l.data[1:]
-			}
+			v := l.data[p]
+			l.data = append(l.data[0:p], l.data[p+1:]...)
 			return join(vm, v)
 		}),
 		Text("join"): Func(func(vm *VM, aa *Args) *Args {

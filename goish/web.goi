@@ -4,6 +4,11 @@ MB = KB * 1024
 GB = MB * 1024
 TB = GB * 1024
 
+KHz = 1000
+MHz = KHz * 1000
+GHz = MHz * 1000
+THz = GHz * 1000
+
 services = function
 	api = {}
 	group = sync.group()
@@ -20,16 +25,28 @@ services = function
 		end
 	end)
 
+	-- syslog
+	err = sync.channel(100)
+	api.log = function(msg)
+		err:write(msg)
+	end
+	group:run(function
+		for err do(entry)
+			log(entry)
+		end
+	end)
+
 	-- services.stop()
 	api.stop = function
 		seq:close()
+		err:close()
 		group:wait()
 	end
 
 	return api
 end()
 
-core = {
+common = {
 	init = function(self)
 		self.id = services.id()
 		self.todo = sync.queue()
@@ -46,29 +63,167 @@ core = {
 	end
 }
 
+address = function
+
+	proto = {
+
+		host = function(self)
+			return self\0
+		end,
+
+		process = function(self)
+			return self\1
+		end,
+	}
+
+	return function(host, process)
+		return setprototype([ host, process ], proto)
+	end
+
+end()
+
+message = function
+
+	proto = {
+
+		to = function(self)
+			return self\0
+		end,
+
+		from = function(self)
+			return self\1
+		end,
+
+		body = function(self)
+			return self\2
+		end,
+	}
+
+	return function(to, from, body)
+		return setprototype([ to, from, body ], proto)
+	end
+
+end()
+
+
+starnix = {
+
+	init = function(self)
+		services.log(self.id, "boot")
+
+		self.processes = {
+
+			dispatch = function
+				queue = sync.queue()
+
+				run = function
+					self:job(run)
+					self:log("dispatch")
+
+					for queue do(msg)
+						if (to = msg:to()) and to:host() == self:host() and (process = to:process()) then
+							if pq = self.processes\process then
+								pq:write(msg)
+							else
+								self:log("drop message", message)
+							end
+						end
+					end
+				end
+
+				self:job(run)
+				return queue
+			end(),
+		}
+	end,
+
+	log = function(self, msg...)
+		services.log(msg:shove(self.id))
+	end,
+
+	host = function(self)
+		return self.name
+	end,
+
+	run = function(self, name, queue)
+		self:job(function
+			if #self.processes < 100 then
+				self.processes\name = queue
+			end
+		end)
+	end,
+
+	exit = function(self, name)
+		self:job(function
+			self.processes:drop(name)
+		end)
+	end,
+
+	send = function(self, name, message)
+		self:job(function
+			if queue = self.processes\name then
+				queue:write(message)
+			end
+		end)
+	end,
+}
+
 chassis = {
 	init = function(self)
 		self.devices = []
 	end,
 
+	contains = function(self, dev)
+		id = dev:id()
+		found = false
+		for self.devices do (i, d)
+			if d:id() == id then
+				found = true
+				break
+			end
+		end
+		return found
+	end,
+
 	insert = function(self, dev)
-		self.job(do
-			self.devices:push(dev)
+		self.job(function
+			if not self:contains(dev) then
+				self.devices:push(dev)
+			end
+		end)
+	end,
+
+	remove = function(self, dev)
+		self.job(function
+			id = dev:id()
+			for self.devices do(i, d)
+				if d:id() == id then
+					self.devices:remove(i)
+					break
+				end
+			end
 		end)
 	end,
 }
 
 create = function(roles)
 
-	roles = (roles or []):shove(core)
+	roles = (roles or []):shove(common)
 	node = setprototype({}, roles)
 
 	for roles do(i, role)
-		role.init(node)
+		if role.init then
+			role.init(node)
+		end
 	end
 
 	return node
 end
+
+node = create([chassis,starnix])
+node:jobs()
+node:jobs()
+node:jobs()
 
 play = function(group, inbox)
 

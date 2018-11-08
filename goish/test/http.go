@@ -23,7 +23,7 @@ func (r HttpReq) String() string {
 	return r.Type()
 }
 
-func (r HttpReq) Lib() Findable {
+func (r HttpReq) Lib() Searchable {
 	return protoHttpReq
 }
 
@@ -39,7 +39,7 @@ func (r WebSock) String() string {
 	return r.Type()
 }
 
-func (r WebSock) Lib() Findable {
+func (r WebSock) Lib() Searchable {
 	return protoWebSock
 }
 
