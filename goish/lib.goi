@@ -11,14 +11,12 @@ nil     = []:remove(0)
 
 print = function(a...)
 	for a do(i, v)
-		s = v:string()
-		if type(s) <> "text" then
-			s = super.string(v)
-		end
-		a\i = s
+		a\i = v:string()
 	end
 	io.stdout:write(a:join("\t").."\n")
-	io.stdout:flush()
+	if not err = io.stdout:flush() then
+		log("flush fail!", err)
+	end
 end
 
 function()

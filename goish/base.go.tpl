@@ -14,7 +14,6 @@ import "io"
 import "io/ioutil"
 import "runtime/pprof"
 import "encoding/hex"
-import "bufio"
 import "errors"
 import "encoding/json"
 import "regexp"
@@ -718,15 +717,7 @@ type Stream struct {
 }
 
 func NewStream(s interface{}) Stream {
-	r, reader := s.(io.Reader)
-	w, writer := s.(io.Writer)
-	if reader && writer {
-		return Stream{bufio.NewReadWriter(bufio.NewReader(r), bufio.NewWriter(w))}
-	}
-	if writer {
-		return Stream{bufio.NewWriter(w)}
-	}
-	return Stream{bufio.NewReader(r)}
+	return Stream{s}
 }
 
 func (s Stream) Type() string {
@@ -745,7 +736,7 @@ func (s Stream) Flush() error {
 	if f, is := s.s.(Flusher); is {
 		return f.Flush()
 	}
-	return errors.New("not a flusher")
+	return nil
 }
 
 func (s Stream) Close() error {
@@ -1128,15 +1119,6 @@ func ifnil(a, b Any) Any {
 	}
 	return a
 }
-
-var Nprint Any = Func(func(vm *VM, aa *Args) *Args {
-	parts := []string{}
-	for i := 0; i < aa.len(); i++ {
-		parts = append(parts, tostring(aa.get(i)))
-	}
-	fmt.Printf("%s\n", strings.Join(parts, "\t"))
-	return aa
-})
 
 var Nlog Any = Func(func(vm *VM, aa *Args) *Args {
 	parts := []string{}
