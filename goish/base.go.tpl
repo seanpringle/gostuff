@@ -695,11 +695,8 @@ func (g *Group) Run(f Func, t *Args) {
 		aa.set(i+1, t.get(i))
 	}
 	go func() {
-		defer func() {
-			recover()
-			g.g.Done()
-		}()
 		f(vm, aa)
+		g.g.Done()
 	}()
 }
 
@@ -1119,15 +1116,6 @@ func ifnil(a, b Any) Any {
 	}
 	return a
 }
-
-var Nlog Any = Func(func(vm *VM, aa *Args) *Args {
-	parts := []string{}
-	for i := 0; i < aa.len(); i++ {
-		parts = append(parts, tostring(aa.get(i)))
-	}
-	fmt.Fprintf(os.Stderr, "%s\n", strings.Join(parts, "\t"))
-	return aa
-})
 
 var Nio *Map
 var Ntime *Map

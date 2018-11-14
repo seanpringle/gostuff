@@ -14,9 +14,27 @@ print = function(a...)
 		a\i = v:string()
 	end
 	io.stdout:write(a:join("\t").."\n")
-	if not err = io.stdout:flush() then
-		log("flush fail!", err)
+	io.stdout:flush()
+end
+
+log = function(a...)
+	for a do(i, v)
+		a\i = v:string()
 	end
+	io.stderr:write(a:join("\t").."\n")
+	io.stderr:flush()
+end
+
+is = function(class, object)
+	proto = getprototype(object)
+	if type(proto) == "list" then
+		for proto do(i, item)
+			if item == class then
+				return true
+			end
+		end
+	end
+	return class == proto
 end
 
 function()
@@ -85,6 +103,12 @@ function()
 
 	p.shift = function(list)
 		return list:remove(0)
+	end
+
+	p.clear = function(list)
+		for #list do
+			list:pop()
+		end
 	end
 
 	p.iterate = function(list)

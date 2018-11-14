@@ -9,47 +9,72 @@ MHz = KHz * 1000
 GHz = MHz * 1000
 THz = GHz * 1000
 
-services = function
-	api = {}
-	group = sync.group()
+position = function
 
-	-- services.id()
-	seq = sync.channel(0)
-	api.id = function
-		return seq:read()
-	end
-	group:run(function
-		n = 1
-		while seq:write(n) do
-			n = n+1
-		end
-	end)
+	proto = {
 
-	-- syslog
-	err = sync.channel(100)
-	api.log = function(msg)
-		err:write(msg)
-	end
-	group:run(function
-		for err do(entry)
-			log(entry)
-		end
-	end)
+		x = function(self)
+			return self\0
+		end,
 
-	-- services.stop()
-	api.stop = function
-		seq:close()
-		err:close()
-		group:wait()
+		y = function(self)
+			return self\1
+		end,
+	}
+
+	return function(x, y)
+		return setprototype([x, y], proto)
 	end
 
-	return api
+end()
+
+circle = function
+
+	proto = {
+
+		x = function(self)
+			return (self\0):x()
+		end,
+
+		y = function(self)
+			return (self\0):x()
+		end,
+
+		r = function(self)
+			return self\1
+		end,
+	}
+
+	return function(pos, r)
+		return setprototype([pos, r], proto)
+	end
+
+end()
+
+emission = function
+
+	proto = {
+
+		circle = function(self)
+			return self\0
+		end,
+
+		packet = function(self)
+			return self\1
+		end,
+	}
+
+	return function(circle, packet)
+		return setprototype([circle, packet], proto)
+	end
+
 end()
 
 common = {
 	init = function(self)
-		self.id = services.id()
+		self.id = sim.id()
 		self.todo = sync.queue()
+		self.position = position(0, 0)
 	end,
 
 	jobs = function(self)
@@ -60,7 +85,15 @@ common = {
 
 	job = function(self, fn)
 		self.todo:write(fn)
-	end
+	end,
+
+	tick = function(self, n)
+		for getprototype(self) do(i, proto)
+			if i > 0 and (t = proto.tick) then
+				t(self, n)
+			end
+		end
+	end,
 }
 
 address = function
@@ -86,6 +119,10 @@ message = function
 
 	proto = {
 
+		bcast = function(self)
+			return self\0 == nil
+		end,
+
 		to = function(self)
 			return self\0
 		end,
@@ -105,40 +142,121 @@ message = function
 
 end()
 
+sim = function
+
+	api = {}
+	group = sync.group()
+
+	-- sim.id()
+	seq = sync.channel(8)
+
+	api.id = function
+		return seq:read()
+	end
+
+	group:run(function
+		n = 1
+		while seq:write(n) do
+			n = n+1
+		end
+	end)
+
+	todo = sync.queue()
+
+	api.job = function(fn)
+		todo:write(fn)
+	end
+
+	api.jobs = function(n)
+		for todo do(fn)
+			fn()
+		end
+	end
+
+	nodes = {}
+
+	api.register = function(node)
+		id = node.id
+		api.job(do
+			log("register", id)
+			nodes\id = node
+		end)
+	end
+
+	api.unregister = function(node)
+		id = node.id
+		if nodes\id then
+			api.job(do
+				log("unregister", id)
+				nodes:drop(id)
+			end)
+		end
+	end
+
+	api.intersect = function(circle)
+		hits = []
+		for nodes do(id, node)
+			hits:push(node)
+		end
+		return hits
+	end
+
+	emissions = []
+
+	api.emit = function(emission)
+		api.job(function
+			emissions:push(emission)
+		end)
+	end
+
+	api.emissions = function(circle)
+		recv = []
+		for emissions do(i, e)
+			recv:push(e)
+		end
+		return recv
+	end
+
+	tick = time.ticker(1000 * time.ms)
+
+	group:run(function
+		for tick do(n, stamp)
+			log("tick", n)
+
+			emissions:clear()
+
+			api.jobs(n)
+
+			for nodes do(id, node)
+				node:tick(n)
+			end
+
+			for nodes do(id, node)
+				node:jobs(n)
+			end
+		end
+	end)
+
+	-- sim.stop()
+	api.stop = function
+		seq:close()
+		tick:close()
+		group:wait()
+	end
+
+	return api
+
+end()
 
 starnix = {
 
 	init = function(self)
 		self:log("boot")
-
-		self.processes = {
-
-			dispatch = function
-				queue = sync.queue()
-
-				run = function
-					self:job(run)
-					self:log("dispatch")
-
-					for queue do(msg)
-						if (to = msg:to()) and to:host() == self:host() and (process = to:process()) then
-							if pq = self.processes\process then
-								pq:write(msg)
-							else
-								self:log("drop message", message)
-							end
-						end
-					end
-				end
-
-				self:job(run)
-				return queue
-			end(),
-		}
+		self.processes = {}
 	end,
 
 	log = function(self, msg...)
-		services.log(msg:shove(self.id))
+		log(self.id, msg...)
 	end,
 
 	host = function(self)
@@ -168,45 +286,64 @@ starnix = {
 	end,
 }
 
-chassis = {
+wifi_bcast = function
+
+	proto = {
+		ssid = function(self)
+			return self\0
+		end,
+	}
+
+	return function(ssid)
+		return setprototype([ssid], proto)
+	end
+
+end()
+
+wifiap = {
+
 	init = function(self)
-		self.devices = []
+		self:log("boot wifiap")
+		self.ssid = "default"
 	end,
 
-	contains = function(self, dev)
-		id = dev:id()
-		found = false
-		for self.devices do (i, d)
-			if d:id() == id then
-				found = true
-				break
-			end
-		end
-		return found
-	end,
-
-	insert = function(self, dev)
-		self.job(function
-			if not self:contains(dev) then
-				self.devices:push(dev)
-			end
-		end)
-	end,
-
-	remove = function(self, dev)
-		self.job(function
-			id = dev:id()
-			for self.devices do(i, d)
-				if d:id() == id then
-					self.devices:remove(i)
-					break
-				end
-			end
-		end)
+	tick = function(self)
+		self:log("emit", self.ssid)
+		sim.emit(
+			emission(
+				circle(
+					position(0, 0),
+					10,
+				),
+				message(
+					nil,
+					self,
+					wifi_bcast(self.ssid),
+				),
+			),
+		)
 	end,
 }
 
-create = function(roles)
+wifi = {
+
+	init = function(self)
+		self:log("boot wifi")
+		self.ssid = nil
+	end,
+
+	tick = function(self)
+		for sim.emissions() do (i, emission)
+			packet = emission:packet()
+			self:log(packet:bcast(), packet:body().ssid)
+			if packet:bcast() and packet:body().ssid then
+				self:log("join", packet:body():ssid())
+			end
+		end
+	end,
+}
+
+create = function(roles...)
 
 	roles = (roles or []):shove(common)
 	node = setprototype({}, roles)
@@ -217,13 +354,13 @@ create = function(roles)
 		end
 	end
 
+	sim.register(node)
 	return node
 end
 
-node = create([chassis,starnix])
-node:jobs()
-node:jobs()
-node:jobs()
+ap = create(starnix, wifiap)
+alice = create(starnix, wifi)
+bob = create(starnix, wifi)
 
 play = function(group, inbox)
 
