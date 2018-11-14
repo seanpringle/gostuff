@@ -198,3 +198,10 @@ f = function(a...)
 end
 
 print([1,2,3]...)
+
+defer print("deferred!")
+defer print("deferred! 2")
+
+for 3 do(i)
+	defer print("defer", i)
+end

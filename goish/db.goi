@@ -1,6 +1,12 @@
 
-ok, db = sql.open("postgres", "user=postgres")
+print(ok, db = sql.open("postgres", "dbname=postgres sslmode=disable"))
+defer db:close()
 
+print(ok, res = db:query("select * from t1 where c2 = $1", "hello"))
+defer res:close()
 
-
-db:close()
+for res do(row)
+	for row do(k, v)
+		print(type(v), k, v)
+	end
+end

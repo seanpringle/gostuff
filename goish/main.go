@@ -537,6 +537,15 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeContinue()
 	}
 
+	if p.peek("defer") {
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		p.take()
+		return NewNodeDefer(p.expression(block))
+	}
+
 	if p.isnumber(p.scan()) {
 		isDec := false
 		for p.isnumber(p.next()) {

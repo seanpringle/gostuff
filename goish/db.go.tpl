@@ -3,6 +3,7 @@ package main
 import "database/sql"
 import "time"
 import "errors"
+import "log"
 import _ "github.com/lib/pq"
 
 type DBCon struct {
@@ -65,6 +66,7 @@ func init() {
 			Text("close"): Func(func(vm *VM, aa *Args) *Args {
 				con := aa.get(0).(DBCon)
 				vm.da(aa)
+				log.Println("db close")
 				return join(vm, NewStatus(con.db.Close()))
 			}),
 
@@ -95,6 +97,13 @@ func init() {
 
 		protoDBRes = NewMap(MapData{
 
+			Text("close"): Func(func(vm *VM, aa *Args) *Args {
+				res := aa.get(0).(DBRes)
+				vm.da(aa)
+				log.Println("res close")
+				return join(vm, NewStatus(res.rows.Close()))
+			}),
+
 			Text("iterate"): Func(func(vm *VM, aa *Args) *Args {
 
 				res := aa.get(0).(DBRes)
@@ -102,9 +111,8 @@ func init() {
 				vm.da(aa)
 
 				return join(vm, Func(func(vm *VM, aa *Args) *Args {
-					next := truth(aa.get(0))
 
-					if next && res.rows.Next() {
+					if res.rows.Next() {
 
 						columns := make([]interface{}, len(cols))
 						columnPointers := make([]interface{}, len(cols))
@@ -141,10 +149,6 @@ func init() {
 							}
 						}
 						return join(vm, m)
-					}
-
-					if !next {
-						res.rows.Close()
 					}
 
 					return join(vm, nil)
