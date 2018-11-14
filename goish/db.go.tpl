@@ -3,7 +3,8 @@ package main
 import "database/sql"
 import "time"
 import "errors"
-import "log"
+
+//import "log"
 import _ "github.com/lib/pq"
 
 type DBCon struct {
@@ -20,6 +21,22 @@ func (r DBCon) String() string {
 
 func (r DBCon) Lib() Searchable {
 	return protoDBCon
+}
+
+type DBTx struct {
+	tx *sql.Tx
+}
+
+func (r DBTx) Type() string {
+	return "database-transaction"
+}
+
+func (r DBTx) String() string {
+	return r.Type()
+}
+
+func (r DBTx) Lib() Searchable {
+	return protoDBTx
 }
 
 type DBRes struct {
@@ -40,11 +57,32 @@ func (r DBRes) Lib() Searchable {
 
 var libSQL *Map
 var protoDBCon *Map
+var protoDBTx *Map
 var protoDBRes *Map
 var Nsql Any
 
 func init() {
 	onInit = append(onInit, func() {
+
+		sqlArgs := func(aa *Args) []interface{} {
+			args := []interface{}{}
+			for i := 2; i < aa.len(); i++ {
+				arg := aa.get(i)
+				switch arg.(type) {
+				case Int:
+					args = append(args, int64(arg.(Int)))
+				case Dec:
+					args = append(args, float64(arg.(Dec)))
+				default:
+					if arg == nil {
+						args = append(args, nil)
+					} else {
+						args = append(args, totext(arg))
+					}
+				}
+			}
+			return args
+		}
 
 		libSQL = NewMap(MapData{
 
@@ -66,25 +104,34 @@ func init() {
 			Text("close"): Func(func(vm *VM, aa *Args) *Args {
 				con := aa.get(0).(DBCon)
 				vm.da(aa)
-				log.Println("db close")
 				return join(vm, NewStatus(con.db.Close()))
+			}),
+
+			Text("begin"): Func(func(vm *VM, aa *Args) *Args {
+				con := aa.get(0).(DBCon)
+				vm.da(aa)
+				tx, err := con.db.Begin()
+				return join(vm, NewStatus(err), DBTx{tx})
+			}),
+
+			Text("execute"): Func(func(vm *VM, aa *Args) *Args {
+				con := aa.get(0).(DBCon)
+				sql := totext(aa.get(1))
+				args := sqlArgs(aa)
+				vm.da(aa)
+				result, err := con.db.Exec(sql, args...)
+				if err != nil {
+					return join(vm, NewStatus(err))
+				}
+				id, _ := result.LastInsertId()
+				affected, _ := result.RowsAffected()
+				return join(vm, NewStatus(err), Int(id), Int(affected))
 			}),
 
 			Text("query"): Func(func(vm *VM, aa *Args) *Args {
 				con := aa.get(0).(DBCon)
 				sql := totext(aa.get(1))
-				args := []interface{}{}
-				for i := 2; i < aa.len(); i++ {
-					arg := aa.get(i)
-					switch arg.(type) {
-					case Int:
-						args = append(args, int64(arg.(Int)))
-					case Dec:
-						args = append(args, float64(arg.(Dec)))
-					default:
-						args = append(args, totext(arg))
-					}
-				}
+				args := sqlArgs(aa)
 				vm.da(aa)
 				rows, err := con.db.Query(sql, args...)
 				if err != nil {
@@ -95,12 +142,53 @@ func init() {
 		})
 		protoDBCon.meta = protoDef
 
+		protoDBTx = NewMap(MapData{
+
+			Text("commit"): Func(func(vm *VM, aa *Args) *Args {
+				tx := aa.get(0).(DBTx)
+				vm.da(aa)
+				return join(vm, NewStatus(tx.tx.Commit()))
+			}),
+
+			Text("rollback"): Func(func(vm *VM, aa *Args) *Args {
+				tx := aa.get(0).(DBTx)
+				vm.da(aa)
+				return join(vm, NewStatus(tx.tx.Rollback()))
+			}),
+
+			Text("execute"): Func(func(vm *VM, aa *Args) *Args {
+				tx := aa.get(0).(DBTx)
+				sql := totext(aa.get(1))
+				args := sqlArgs(aa)
+				vm.da(aa)
+				result, err := tx.tx.Exec(sql, args...)
+				if err != nil {
+					return join(vm, NewStatus(err))
+				}
+				id, _ := result.LastInsertId()
+				affected, _ := result.RowsAffected()
+				return join(vm, NewStatus(err), Int(id), Int(affected))
+			}),
+
+			Text("query"): Func(func(vm *VM, aa *Args) *Args {
+				tx := aa.get(0).(DBTx)
+				sql := totext(aa.get(1))
+				args := sqlArgs(aa)
+				vm.da(aa)
+				rows, err := tx.tx.Query(sql, args...)
+				if err != nil {
+					return join(vm, NewStatus(err))
+				}
+				return join(vm, NewStatus(err), DBRes{rows})
+			}),
+		})
+		protoDBTx.meta = protoDef
+
 		protoDBRes = NewMap(MapData{
 
 			Text("close"): Func(func(vm *VM, aa *Args) *Args {
 				res := aa.get(0).(DBRes)
 				vm.da(aa)
-				log.Println("res close")
 				return join(vm, NewStatus(res.rows.Close()))
 			}),
 

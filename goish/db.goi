@@ -2,7 +2,7 @@
 print(ok, db = sql.open("postgres", "dbname=postgres sslmode=disable"))
 defer db:close()
 
-print(ok, res = db:query("select * from t1 where c2 = $1", "hello"))
+print(ok, res = db:query("select *, $2 as c9 from t1 where c2 = $1", "hello", nil))
 defer res:close()
 
 for res do(row)
@@ -10,3 +10,6 @@ for res do(row)
 		print(type(v), k, v)
 	end
 end
+
+print(ok, tx = db:begin())
+print(tx:rollback())
