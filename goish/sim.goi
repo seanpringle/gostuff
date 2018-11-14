@@ -1,0 +1,410 @@
+
+KB = 1024
+MB = KB * 1024
+GB = MB * 1024
+TB = GB * 1024
+
+KHz = 1000
+MHz = KHz * 1000
+GHz = MHz * 1000
+THz = GHz * 1000
+
+position = function
+
+	proto = {
+
+		x = function(self)
+			return self\0
+		end,
+
+		y = function(self)
+			return self\1
+		end,
+	}
+
+	return function(x, y)
+		return setprototype([x, y], proto)
+	end
+
+end()
+
+circle = function
+
+	proto = {
+
+		x = function(self)
+			return (self\0):x()
+		end,
+
+		y = function(self)
+			return (self\0):x()
+		end,
+
+		r = function(self)
+			return self\1
+		end,
+	}
+
+	return function(pos, r)
+		return setprototype([pos, r], proto)
+	end
+
+end()
+
+emission = function
+
+	proto = {
+
+		circle = function(self)
+			return self\0
+		end,
+
+		packet = function(self)
+			return self\1
+		end,
+	}
+
+	return function(circle, packet)
+		return setprototype([circle, packet], proto)
+	end
+
+end()
+
+common = {
+	init = function(self)
+		self.id = sim.id()
+		self.todo = sync.queue()
+		self.position = position(0, 0)
+	end,
+
+	jobs = function(self)
+		for self.todo do(fn)
+			fn(self)
+		end
+	end,
+
+	job = function(self, fn)
+		self.todo:write(fn)
+	end,
+
+	tick = function(self, n)
+		for getprototype(self) do(i, proto)
+			if i > 0 and (t = proto.tick) then
+				t(self, n)
+			end
+		end
+	end,
+}
+
+address = function
+
+	proto = {
+
+		host = function(self)
+			return self\0
+		end,
+
+		process = function(self)
+			return self\1
+		end,
+	}
+
+	return function(host, process)
+		return setprototype([ host, process ], proto)
+	end
+
+end()
+
+message = function
+
+	proto = {
+
+		bcast = function(self)
+			return self\0 == nil
+		end,
+
+		to = function(self)
+			return self\0
+		end,
+
+		from = function(self)
+			return self\1
+		end,
+
+		body = function(self)
+			return self\2
+		end,
+	}
+
+	return function(to, from, body)
+		return setprototype([ to, from, body ], proto)
+	end
+
+end()
+
+sim = function
+
+	api = {}
+	group = sync.group()
+
+	-- sim.id()
+	seq = sync.channel(8)
+
+	api.id = function
+		return seq:read()
+	end
+
+	group:run(function
+		n = 1
+		while seq:write(n) do
+			n = n+1
+		end
+	end)
+
+	todo = sync.queue()
+
+	api.job = function(fn)
+		todo:write(fn)
+	end
+
+	api.jobs = function(n)
+		for todo do(fn)
+			fn()
+		end
+	end
+
+	nodes = {}
+
+	api.register = function(node)
+		id = node.id
+		api.job(do
+			log("register", id)
+			nodes\id = node
+		end)
+	end
+
+	api.unregister = function(node)
+		id = node.id
+		if nodes\id then
+			api.job(do
+				log("unregister", id)
+				nodes:drop(id)
+			end)
+		end
+	end
+
+	api.intersect = function(circle)
+		hits = []
+		for nodes do(id, node)
+			hits:push(node)
+		end
+		return hits
+	end
+
+	emissions = []
+
+	api.emit = function(emission)
+		api.job(function
+			emissions:push(emission)
+		end)
+	end
+
+	api.emissions = function(circle)
+		recv = []
+		for emissions do(i, e)
+			recv:push(e)
+		end
+		return recv
+	end
+
+	tick = time.ticker(1000 * time.ms)
+
+	group:run(function
+		for tick do(n, stamp)
+			log("tick", n)
+
+			emissions:clear()
+
+			api.jobs(n)
+
+			for nodes do(id, node)
+				node:tick(n)
+			end
+
+			for nodes do(id, node)
+				node:jobs(n)
+			end
+		end
+	end)
+
+	-- sim.stop()
+	api.stop = function
+		seq:close()
+		tick:close()
+		group:wait()
+	end
+
+	return api
+
+end()
+
+starnix = {
+
+	init = function(self)
+		self:log("boot")
+		self.processes = {}
+	end,
+
+	log = function(self, msg...)
+		log(self.id, msg...)
+	end,
+
+	host = function(self)
+		return self.name
+	end,
+
+	run = function(self, name, queue)
+		self:job(function
+			if #self.processes < 100 then
+				self.processes\name = queue
+			end
+		end)
+	end,
+
+	exit = function(self, name)
+		self:job(function
+			self.processes:drop(name)
+		end)
+	end,
+
+	send = function(self, name, message)
+		self:job(function
+			if queue = self.processes\name then
+				queue:write(message)
+			end
+		end)
+	end,
+}
+
+wifi_bcast = function
+
+	proto = {
+		ssid = function(self)
+			return self\0
+		end,
+	}
+
+	return function(ssid)
+		return setprototype([ssid], proto)
+	end
+
+end()
+
+wifiap = {
+
+	init = function(self)
+		self:log("boot wifiap")
+		self.ssid = "default"
+	end,
+
+	tick = function(self)
+		self:log("emit", self.ssid)
+		sim.emit(
+			emission(
+				circle(
+					position(0, 0),
+					10,
+				),
+				message(
+					nil,
+					self,
+					wifi_bcast(self.ssid),
+				),
+			),
+		)
+	end,
+}
+
+wifi = {
+
+	init = function(self)
+		self:log("boot wifi")
+		self.ssid = nil
+	end,
+
+	tick = function(self)
+		for sim.emissions() do (i, emission)
+			packet = emission:packet()
+			self:log(packet:bcast(), packet:body().ssid)
+			if packet:bcast() and packet:body().ssid then
+				self:log("join", packet:body():ssid())
+			end
+		end
+	end,
+}
+
+create = function(roles...)
+
+	roles = (roles or []):shove(common)
+	node = setprototype({}, roles)
+
+	for roles do(i, role)
+		if role.init then
+			role.init(node)
+		end
+	end
+
+	sim.register(node)
+	return node
+end
+
+ap = create(starnix, wifiap)
+alice = create(starnix, wifi)
+bob = create(starnix, wifi)
+
+play = function(group, inbox)
+
+	outbox = sync.channel(8)
+
+	group:run(function
+		for inbox do(msg)
+			if try, msg = msg:json() then
+				print("got", msg)
+				outbox:write("ok")
+			else
+				log(try)
+			end
+		end
+		outbox:close()
+	end)
+
+	return outbox
+end
+
+http.serve(":3000", "static/", {
+	"/join" = function(req)
+
+		if ok, ws = req:websocket() then
+			group = sync.group()
+
+			inbox = sync.channel(8)
+			outbox = play(group, inbox)
+
+			group:run(function
+				while try, mode, msg = ws:read() do
+					inbox:write(msg:text())
+				end
+				log(try)
+				inbox:close()
+			end)
+
+			group:run(function
+				for outbox do(msg)
+					ws:write(ws.text, msg)
+				end
+			end)
+
+			group:wait()
+		end
+	end,
+})

@@ -1,0 +1,6 @@
+
+ok, db = sql.open("postgres", "user=postgres")
+
+
+
+db:close()

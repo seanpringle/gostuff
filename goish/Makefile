@@ -7,6 +7,9 @@ bug:
 web:
 	go build && cat lib.goi web.goi | ./goish | gofmt > test/main.go && cat http.go.tpl > test/http.go && cd test && go run *.go
 
+db:
+	go build && cat lib.goi db.goi | ./goish | gofmt > test/main.go && cat db.go.tpl > test/db.go && cd test && go run *.go
+
 fib:
 	cat lib.goi fib.goi | ./goish | gofmt > test/main.go
 
