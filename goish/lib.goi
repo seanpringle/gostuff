@@ -71,6 +71,10 @@ function()
 		return a < b and a or b
 	end
 
+	p.json = function(n)
+		return n:text()
+	end
+
 end()
 
 function()
@@ -82,6 +86,19 @@ function()
 
 	p.min = function(a, b)
 		return a < b and a or b
+	end
+
+	p.json = function(n)
+		return n:text()
+	end
+
+end()
+
+function()
+	p = string
+
+	p.json = function(n)
+		return n:quote()
 	end
 
 end()
@@ -144,6 +161,14 @@ function()
 		return #a < #b and a or b
 	end
 
+	p.json = function(l)
+		parts = []
+		for l do(i, item)
+			parts:push(item:json())
+		end
+		return ["[", parts:join(","), "]" ]:join()
+	end
+
 end()
 
 function()
@@ -175,6 +200,14 @@ function()
 
 	p.min = function(a, b)
 		return #a < #b and a or b
+	end
+
+	p.json = function(m)
+		parts = []
+		for m do(k, v)
+			parts:push([ k:text():quote(), ":", v:json() ]:join())
+		end
+		return ["{", parts:join(","), "}"]:join()
 	end
 
 end()

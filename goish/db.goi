@@ -1,5 +1,5 @@
 
-print(ok, db = sql.open("postgres", "dbname=postgres sslmode=disable"))
+assert(ok, db = sql.open("postgres", "..."))
 defer db:close()
 
 print(ok, res = db:query("select *, $2 as c9 from t1 where c2 = $1", "hello", nil))

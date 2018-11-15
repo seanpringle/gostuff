@@ -58,10 +58,11 @@ func init() {
 				http.Handle("/", http.FileServer(http.Dir(static)))
 
 				for pattern, handler := range routes.data {
-					http.HandleFunc(totext(pattern), func(w http.ResponseWriter, r *http.Request) {
-						r.ParseForm()
+					p := pattern
+					h := handler
+					http.HandleFunc(totext(p), func(w http.ResponseWriter, r *http.Request) {
 						vm := &VM{}
-						call(vm, handler, join(vm, HttpReq{r: r, w: w}))
+						call(vm, h, join(vm, HttpReq{r: r, w: w}))
 					})
 				}
 				return join(vm, NewStatus(http.ListenAndServe(addr, nil)))
@@ -81,10 +82,11 @@ func init() {
 				req := aa.get(0).(HttpReq)
 				key := totext(aa.get(1))
 				vm.da(aa)
-				if v, ok := req.r.Form[key]; ok {
-					return join(vm, NewStatus(nil), Blob(v[0]))
+				v := req.r.FormValue(key)
+				if v == "" {
+					return join(vm, NewStatus(fmt.Errorf("key not found: %s", key)))
 				}
-				return join(vm, NewStatus(fmt.Errorf("key not found: %s", key)))
+				return join(vm, NewStatus(nil), Text(v))
 			}),
 
 			Text("write"): Func(func(vm *VM, aa *Args) *Args {

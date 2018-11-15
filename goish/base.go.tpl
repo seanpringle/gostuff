@@ -981,6 +981,36 @@ func call(vm *VM, f Any, aa *Args) *Args {
 	return f.(Func)(vm, aa)
 }
 
+func catch(vm *VM, f Any) {
+	if r := recover(); r != nil {
+		var a Any
+		switch r.(type) {
+		case error:
+			a = NewStatus(r.(error))
+		case Any:
+			a = r.(Any)
+		default:
+			a = NewStatus(errors.New("unknown error"))
+		}
+		aa := vm.ga(1)
+		aa.set(0, a)
+		f.(Func)(vm, aa)
+	}
+}
+
+func try(vm *VM, aa *Args) *Args {
+	if !truth(aa.get(0)) {
+		panic(aa.get(0))
+	}
+	n := aa.len() - 1
+	bb := vm.ga(n)
+	for i := 0; i < n; i++ {
+		bb.set(i, aa.get(i+1))
+	}
+	vm.da(aa)
+	return bb
+}
+
 func find(t Any, key Any) Any {
 	if t != nil {
 		return t.Lib().Search(key)
@@ -1130,13 +1160,18 @@ var Ntype Any = Func(func(vm *VM, aa *Args) *Args {
 	return join(vm, Text("nil"))
 })
 
-var Nerror Any = Func(func(vm *VM, aa *Args) *Args {
+var Nstatus Any = Func(func(vm *VM, aa *Args) *Args {
 	msg := aa.get(0)
 	vm.da(aa)
 	if msg != nil {
 		return join(vm, NewStatus(errors.New(tostring(msg))))
 	}
 	return join(vm, NewStatus(nil))
+})
+
+var Nexit Any = Func(func(vm *VM, aa *Args) *Args {
+	os.Exit(int(aa.get(0).(IntIsh).Int()))
+	return nil
 })
 
 var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
@@ -1319,6 +1354,11 @@ func init() {
 			s := totext(aa.get(0))
 			vm.da(aa)
 			return join(vm, Blob(s))
+		}),
+		Text("quote"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(fmt.Sprintf("%q", s)))
 		}),
 		Text("json"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))

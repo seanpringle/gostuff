@@ -1,46 +1,50 @@
-client = function(group, inbox)
 
-	outbox = sync.channel(8)
+catch do(err)
+	log("application error", err)
+	exit(1)
+end
 
-	group:run(function
-		for inbox do(msg)
-			if try, msg = msg:json() then
-				print("got", msg)
-				outbox:write("ok")
-			else
-				log(try)
-			end
-		end
-		outbox:close()
-	end)
+db = try sql.open("postgres", "...")
+defer db:close()
 
-	return outbox
+wtf = function(req, err)
+	log("client error", err)
+	req:write({ error = err:string() }:json())
 end
 
 http.serve(":3000", "static/", {
-	"/join" = function(req)
 
-		if ok, ws = req:websocket() then
-			group = sync.group()
+	"/datasets" = function(req)
 
-			inbox = sync.channel(8)
-			outbox = client(group, inbox)
-
-			group:run(function
-				while try, mode, msg = ws:read() do
-					inbox:write(msg:text())
-				end
-				log(try)
-				inbox:close()
-			end)
-
-			group:run(function
-				for outbox do(msg)
-					ws:write(ws.text, msg)
-				end
-			end)
-
-			group:wait()
+		catch do(err)
+			wtf(req, err)
 		end
+
+		rs = try db:query([[
+			select * from datasets order by project, name, path
+		]])
+
+		defer rs:close()
+
+		items = []
+		for rs do(row)
+			items:push(row)
+		end
+
+		req:write({ state = "ok", datasets = items }:json())
+
+	end,
+
+	"/browse" = function(req)
+
+		catch do(err)
+			wtf(req, err)
+		end
+
+		path = try req:get("path")
+		log(path)
+
+		req:write({ state = "ok", paths = [] }:json())
+
 	end,
 })

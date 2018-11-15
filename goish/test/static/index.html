@@ -1,21 +1,66 @@
 <html>
 <head>
 	<title>MAS</title>
+	<script type="text/javascript" src="util.js"></script>
+
 	<script type="text/javascript">
-		function run() {
-			var ws = new WebSocket("ws://localhost:3000/join");
 
-			ws.onopen = function() {
-				ws.send(JSON.stringify({a: 1 }));
-			};
+		function browse(path) {
+			post('/browse', { path: path }, function(response) {
+				console.log(response);
+			});
+		}
 
-			ws.onmessage = function (evt) {
-				console.log(evt)
-			}
+		function datasets() {
+			post('/datasets', {}, function(response) {
+				table = select(document, '#datasets').one();
+				foreach(response.datasets, function(i, ds) {
+					var td1 = select(create('td'))
+						.text(ds.project)
+						.one();
+					var td2 = select(create('td'))
+						.text(ds.name)
+						.one();
+					var td3 = select(create('td'))
+						.append(
+							select(create('a'))
+								.click(function() {
+									browse(ds.path);
+								})
+								.text(ds.path)
+								.one()
+						)
+						.one();
+					var tr = select(create('tr'))
+						.append(td1)
+						.append(td2)
+						.append(td3)
+						.one();
+					select(table, 'tbody')
+						.append(tr);
+				});
+			});
 		}
 	</script>
+
 </head>
-<body onload="run()">
-	hello hello
+<body onload="datasets()">
+	<h1>MAS</h1>
+
+	<table id="datasets">
+
+		<thead>
+			<tr>
+				<th>project</th>
+				<th>name</th>
+				<th>path</th>
+			</tr>
+		</thead>
+
+		<tbody>
+		</tbody>
+
+	</table>
+
 </body>
 </html>
