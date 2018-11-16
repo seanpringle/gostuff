@@ -413,6 +413,10 @@ func (t Instant) String() string {
 	return fmt.Sprintf("%v", time.Time(t))
 }
 
+func (t Instant) Text() Text {
+	return Text(t.String())
+}
+
 func (t Instant) Lib() Searchable {
 	return protoInst
 }
@@ -1360,7 +1364,16 @@ func init() {
 			vm.da(aa)
 			return join(vm, Text(fmt.Sprintf("%q", s)))
 		}),
-		Text("json"): Func(func(vm *VM, aa *Args) *Args {
+		Text("trim"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			c := totext(ifnil(aa.get(1), Text("")))
+			vm.da(aa)
+			if c == "" {
+				return join(vm, Text(strings.TrimSpace(s)))
+			}
+			return join(vm, Text(strings.Trim(s, c)))
+		}),
+		Text("parsejson"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			vm.da(aa)
 			var m interface{}
@@ -1441,6 +1454,10 @@ func init() {
 
 	libTime = NewMap(MapData{
 		Text("ms"): Int(int64(time.Millisecond)),
+		Text("now"): Func(func(vm *VM, aa *Args) *Args {
+			vm.da(aa)
+			return join(vm, Instant(time.Now()))
+		}),
 		Text("ticker"): Func(func(vm *VM, aa *Args) *Args {
 			d := int64(aa.get(0).(Int))
 			vm.da(aa)

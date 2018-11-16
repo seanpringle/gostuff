@@ -1,10 +1,12 @@
 
 catch do(err)
-	log("application error", err)
+	log("abort", err)
 	exit(1)
 end
 
-db = try sql.open("postgres", "...")
+config = try io.slurp("config.json"):parsejson()
+
+db = try sql.open("postgres", config.postgres)
 defer db:close()
 
 wtf = function(req, err)
@@ -28,6 +30,7 @@ http.serve(":3000", "static/", {
 
 		items = []
 		for rs do(row)
+			row.baseline_date = row.baseline:date()
 			items:push(row)
 		end
 
@@ -42,9 +45,27 @@ http.serve(":3000", "static/", {
 		end
 
 		path = try req:get("path")
-		log(path)
 
-		req:write({ state = "ok", paths = [] }:json())
+		rs = try db:query([[
+			select * from paths
+				where path like $1::text and path ~ $2::text
+				order by path
+				limit 10
+			]],
+			path .. "%",
+			"^" .. path .. "/[^/]+$",
+		)
+
+		defer rs:close()
+
+		items = []
+		for rs do(row)
+			items:push(row)
+		end
+
+		print(items)
+
+		req:write({ state = "ok", paths = items }:json())
 
 	end,
 })

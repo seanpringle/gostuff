@@ -14,7 +14,7 @@ func NewNodeReturn(node Node) *NodeReturn {
 
 func (nr *NodeReturn) Format() string {
 	if nr.node == nil {
-		return fmt.Sprintf("return")
+		return fmt.Sprintf("return join(vm, nil)")
 	}
 	return fmt.Sprintf("return %s", FormatJoin(nr.node))
 }

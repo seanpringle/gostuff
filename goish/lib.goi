@@ -8,6 +8,7 @@ stream  = getprototype(io.stdin)
 true    = 0 < 1
 false   = 1 < 0
 nil     = []:remove(0)
+good    = status(nil)
 
 print = function(a...)
 	for a do(i, v)
@@ -205,9 +206,17 @@ function()
 	p.json = function(m)
 		parts = []
 		for m do(k, v)
-			parts:push([ k:text():quote(), ":", v:json() ]:join())
+			kq = k:text():quote()
+			if v == nil then
+				parts:push(kq .. ": null")
+				return
+			end
+			if v.json <> nil then
+				parts:push(kq .. ":" .. v:json())
+				return
+			end
 		end
-		return ["{", parts:join(","), "}"]:join()
+		return "{" .. parts:join(",") .. "}"
 	end
 
 end()
@@ -266,6 +275,19 @@ function()
 end()
 
 function()
+	p = getprototype(time.now())
+
+	p.json = function(t)
+		return t:text():json()
+	end
+
+	p.date = function(t)
+		return t:text():split(" "):shift()
+	end
+
+end()
+
+function()
 	p = stream
 
 	p.readline = function(s)
@@ -296,10 +318,10 @@ function()
 	p = io
 
 	p.slurp = function(path)
-		if ok, file = io.open(path, "r") then
-			if ok, content = file:readall() then
+		if is, file = io.open(path, "r") then
+			if is, content = file:readall() then
 				file:close()
-				return content
+				return content:text()
 			end
 		end
 		return nil

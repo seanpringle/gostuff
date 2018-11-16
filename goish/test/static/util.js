@@ -101,9 +101,21 @@ function select(parent, sel) {
 		});
 		return r;
 	}
+	r.tooltip = function(val) {
+		foreach(items, (i, item) => {
+			item.title = val;
+		});
+		return r;
+	}
 	r.click = function(fn) {
 		foreach(items, (i, item) => {
 			item.addEventListener('click', fn);
+		});
+		return r;
+	}
+	r.clone = function() {
+		foreach(items, (i, item) => {
+			items[i] = item.cloneNode(true);
 		});
 		return r;
 	}

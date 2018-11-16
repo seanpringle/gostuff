@@ -8,7 +8,7 @@ func NewNodeContinue() *NodeContinue {
 }
 
 func (nr *NodeContinue) Format() string {
-	return "return" // NodeLoop
+	return "return join(vm, nil)" // NodeLoop
 }
 
 func (nr *NodeContinue) String() string {
