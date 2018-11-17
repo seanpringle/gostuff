@@ -71,6 +71,14 @@ function select(parent, sel) {
 		});
 		return r;
 	}
+	r.hide = function() {
+		r.css({ display: 'none' })
+		return r;
+	}
+	r.show = function() {
+		r.css({ display: null })
+		return r;
+	}
 	r.remove = function() {
 		foreach(items, (i, item) => {
 			item.remove();

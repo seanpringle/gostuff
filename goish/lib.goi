@@ -28,6 +28,9 @@ end
 
 is = function(class, object)
 	proto = getprototype(object)
+	if class == proto then
+		return true
+	end
 	if type(proto) == "list" then
 		for proto do(i, item)
 			if item == class then
@@ -35,7 +38,7 @@ is = function(class, object)
 			end
 		end
 	end
-	return class == proto
+	return false
 end
 
 function()

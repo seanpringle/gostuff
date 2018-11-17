@@ -5,6 +5,7 @@
 	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 
 	<link href="dashboard.css" rel="stylesheet">
+	<link href="spinner.css" rel="stylesheet">
 
 	<script type="text/javascript" src="util.js"></script>
 
@@ -18,13 +19,14 @@
 
 		function datasets() {
 			post('/datasets', {}, function(response) {
+				select(document, '#datasets-spinner').hide();
 				foreach(response.datasets, function(i, ds) {
-					tr = select(document, "#datasets-table-tpl > tbody > tr").clone().one();
-					select(tr, "td:nth-child(1)").text(ds.project);
-					select(tr, "td:nth-child(2)").text(ds.name);
-					select(tr, "td:nth-child(3)").text(ds.path)
+					tr = select(document, '#datasets-table-tpl > tbody > tr').clone().one();
+					select(tr, 'td:nth-child(1)').text(ds.project);
+					select(tr, 'td:nth-child(2)').text(ds.name);
+					select(tr, 'td:nth-child(3)').text(ds.path)
 						.click(function() { browse(ds.path) });
-					select(tr, "td:nth-child(4)").text(ds.baseline_date).tooltip(ds.baseline);
+					select(tr, 'td:nth-child(4)').text(ds.baseline_date).tooltip(ds.baseline);
 					select(document, '#datasets-table > tbody').append(tr);
 				});
 			});
@@ -146,6 +148,8 @@
 					</tbody>
 
 				</table>
+
+				<div id="datasets-spinner" class="lds-ellipsis"><div></div><div></div><div></div><div></div></div>
 
 				<table id="datasets-table-tpl" style="display: none;">
 					<tbody>

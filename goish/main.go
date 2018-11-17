@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -212,6 +211,14 @@ func (p *Parser) peek(s string) bool {
 	}
 	r := p.char(len(s))
 	return p.iswhite(r) || p.issymbol(r) || r == rune(0)
+}
+
+func (p *Parser) dump() string {
+	var str []rune
+	for i := 0; i < 100; i++ {
+		str = append(str, p.take())
+	}
+	return string(str)
 }
 
 func (p *Parser) terminator() bool {
@@ -453,7 +460,9 @@ func (p *Parser) node(block *NodeBlock) Node {
 		p.take()
 		args := argList()
 		body := p.block(block, Scope{}, nil).(*NodeBlock)
-		ensure(p.peek("end"), "expected: end (function)")
+		if !p.peek("end") {
+			panic("expected: end (function): " + p.dump())
+		}
 		p.take()
 		p.take()
 		p.take()
@@ -853,13 +862,13 @@ func (p *Parser) run() (wtf error) {
 	//		}
 	//	}()
 
-	{
-		data, err := ioutil.ReadFile("base.go.tpl")
-		if err != nil {
-			log.Fatalf("base.go.tpl %v", err)
-		}
-		p.println(string(data))
-	}
+	p.println(`
+		package main
+
+		import "log"
+		import "runtime/pprof"
+		import "os"
+	`)
 
 	block := p.block(nil, Scope{}, nil).Format()
 
@@ -867,24 +876,24 @@ func (p *Parser) run() (wtf error) {
 		p.println(fmt.Sprintf(`const S%d Text = Text(%q)`, n, k))
 	}
 
-	p.println(`func main() {`)
-
 	p.println(`
 
-		f, err := os.Create("cpuprofile")
-		if err != nil {
-			log.Fatal("could not create CPU profile: ", err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
+		func main() {
 
-		for _, f := range onInit {
-			f()
-		}
+			f, err := os.Create("cpuprofile")
+			if err != nil {
+				log.Fatal("could not create CPU profile: ", err)
+			}
+			if err := pprof.StartCPUProfile(f); err != nil {
+				log.Fatal("could not start CPU profile: ", err)
+			}
+			defer pprof.StopCPUProfile()
 
-		vm := &VM{}
+			for _, f := range onInit {
+				f()
+			}
+
+			vm := &VM{}
 
 	`)
 

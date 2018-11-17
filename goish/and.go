@@ -29,7 +29,7 @@ func (no *NodeAnd) Precedence() int {
 }
 
 func (no *NodeAnd) Format() string {
-	return fmt.Sprintf("func() Any { var a Any; a = %s; if truth(a) { var b Any; b = %s; if truth(b) { return b; }; }; return nil }()", no.args[1].Format(), no.args[0].Format())
+	return fmt.Sprintf("func() Any { var a Any; a = %s; if truth(a) { var b Any; b = %s; if truth(b) { return b; }; }; return nil }()", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
 func (no *NodeAnd) String() string {
