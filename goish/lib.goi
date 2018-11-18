@@ -14,7 +14,7 @@ print = function(a...)
 	for a do(i, v)
 		a\i = v:string()
 	end
-	io.stdout:write(a:join("\t").."\n")
+	io.stdout:write(a:join(" ").."\n")
 	io.stdout:flush()
 end
 
@@ -22,7 +22,7 @@ log = function(a...)
 	for a do(i, v)
 		a\i = v:string()
 	end
-	io.stderr:write(a:join("\t").."\n")
+	io.stderr:write(a:join(" ").."\n")
 	io.stderr:flush()
 end
 

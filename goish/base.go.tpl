@@ -915,6 +915,76 @@ func gte(a, b Any) bool {
 	return !lt(a, b)
 }
 
+func b_and(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(ai & bi)
+		}
+	}
+	if ai, is := a.(IntIsh); is {
+		if bi, is := b.(IntIsh); is {
+			return toInt(Int(ai.Int() & bi.Int()))
+		}
+	}
+	panic(fmt.Errorf("invalid AND: %v %v", a, b))
+}
+
+func b_or(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(ai | bi)
+		}
+	}
+	if ai, is := a.(IntIsh); is {
+		if bi, is := b.(IntIsh); is {
+			return toInt(Int(ai.Int() | bi.Int()))
+		}
+	}
+	panic(fmt.Errorf("invalid OR: %v %v", a, b))
+}
+
+func b_xor(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(ai ^ bi)
+		}
+	}
+	if ai, is := a.(IntIsh); is {
+		if bi, is := b.(IntIsh); is {
+			return toInt(Int(ai.Int() ^ bi.Int()))
+		}
+	}
+	panic(fmt.Errorf("invalid XOR: %v %v", a, b))
+}
+
+func lshift(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(Int(uint64(ai) << uint64(bi)))
+		}
+	}
+	if ai, is := a.(IntIsh); is {
+		if bi, is := b.(IntIsh); is {
+			return toInt(Int(uint64(ai.Int()) << uint64(bi.Int())))
+		}
+	}
+	panic(fmt.Errorf("invalid LSHIFT: %v %v", a, b))
+}
+
+func rshift(a, b Any) Any {
+	if ai, is := isInt(a); is {
+		if bi, is := isInt(b); is {
+			return toInt(Int(uint64(ai) >> uint64(bi)))
+		}
+	}
+	if ai, is := a.(IntIsh); is {
+		if bi, is := b.(IntIsh); is {
+			return toInt(Int(uint64(ai.Int()) >> uint64(bi.Int())))
+		}
+	}
+	panic(fmt.Errorf("invalid RSHIFT: %v %v", a, b))
+}
+
 func truth(a interface{}) bool {
 	if a != nil {
 		if b, is := a.(Bool); is {
@@ -1271,6 +1341,12 @@ func init() {
 			}
 			vm.da(aa)
 			return join(vm, NewList(keys))
+		}),
+		Text("drop"): Func(func(vm *VM, aa *Args) *Args {
+			m := aa.get(0).(*Map)
+			k := aa.get(1)
+			m.Drop(k)
+			return join(vm, nil)
 		}),
 	})
 	protoMap.meta = protoDef

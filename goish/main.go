@@ -25,8 +25,8 @@ func ensure(b bool, msg string) {
 	}
 }
 
-func parseInt(str string) int64 {
-	i64, err := strconv.ParseInt(str, 10, 64)
+func parseInt(str string, base int) int64 {
+	i64, err := strconv.ParseInt(str, base, 64)
 	assert(err)
 	return i64
 }
@@ -238,8 +238,17 @@ func (p *Parser) isdigit(c rune) bool {
 	return unicode.IsNumber(c)
 }
 
-func (p *Parser) isnumber(c rune) bool {
-	return p.isdigit(c) || c == '.'
+func (p *Parser) isnumber(c rune, base int) bool {
+	if base == 10 {
+		return p.isdigit(c) || c == '.'
+	}
+	return p.isdigit(c) ||
+		c == 'A' || c == 'a' ||
+		c == 'B' || c == 'b' ||
+		c == 'C' || c == 'c' ||
+		c == 'D' || c == 'd' ||
+		c == 'E' || c == 'e' ||
+		c == 'F' || c == 'f'
 }
 
 func (p *Parser) iswhite(c rune) bool {
@@ -251,7 +260,7 @@ func (p *Parser) issymbol(c rune) bool {
 }
 
 func (p *Parser) isname(c rune) bool {
-	return c != '.' && (p.isalpha(c) || p.isnumber(c) || c == '_')
+	return c != '.' && (p.isalpha(c) || p.isnumber(c, 10) || c == '_')
 }
 
 func (p *Parser) iskeyword(w string) bool {
@@ -332,6 +341,18 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeNe()
 	}
 
+	if p.scan() == '>' && p.char(1) == '>' {
+		p.take()
+		p.take()
+		return NewNodeRShift()
+	}
+
+	if p.scan() == '<' && p.char(1) == '<' {
+		p.take()
+		p.take()
+		return NewNodeLShift()
+	}
+
 	if p.scan() == '<' && p.char(1) == '=' {
 		p.take()
 		return NewNodeLte()
@@ -388,6 +409,21 @@ func (p *Parser) node(block *NodeBlock) Node {
 	if p.scan() == '%' {
 		p.take()
 		return NewNodeMod()
+	}
+
+	if p.scan() == '&' {
+		p.take()
+		return NewNodeBoolAnd()
+	}
+
+	if p.scan() == '|' {
+		p.take()
+		return NewNodeBoolOr()
+	}
+
+	if p.scan() == '^' {
+		p.take()
+		return NewNodeBoolXor()
 	}
 
 	if p.scan() == '#' {
@@ -571,9 +607,15 @@ func (p *Parser) node(block *NodeBlock) Node {
 		return NewNodeTry(p.expression(block))
 	}
 
-	if p.isnumber(p.scan()) {
+	if p.isnumber(p.scan(), 10) {
+		base := 10
+		if p.scan() == '0' && p.char(1) == 'x' {
+			base = 16
+			p.take()
+			p.take()
+		}
 		isDec := false
-		for p.isnumber(p.next()) {
+		for p.isnumber(p.next(), base) {
 			c := p.take()
 			str = append(str, c)
 			isDec = isDec || c == '.'
@@ -581,7 +623,7 @@ func (p *Parser) node(block *NodeBlock) Node {
 		if isDec {
 			return NewNodeLitDec(parseDec(string(str)))
 		}
-		return NewNodeLitInt(parseInt(string(str)))
+		return NewNodeLitInt(parseInt(string(str), base))
 	}
 
 	if p.scan() == '"' {

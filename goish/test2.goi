@@ -199,6 +199,13 @@ end
 
 print([1,2,3]...)
 
+print("and", 1 << 2)
+
+print("hex", 0xFF)
+
+print()
+print()
+
 defer print("deferred!")
 defer print("deferred! 2")
 
@@ -215,3 +222,6 @@ end
 
 print(try do return status(nil), "hello" end())
 print(try do return status("wtf"), "world" end())
+
+
+
