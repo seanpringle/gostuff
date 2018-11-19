@@ -8,23 +8,33 @@ stream  = getprototype(io.stdin)
 true    = 0 < 1
 false   = 1 < 0
 nil     = []:remove(0)
-good    = status(nil)
 
 print = function(a...)
-	for a do(i, v)
-		a\i = v:string()
+	lock = sync.channel(1)
+	return function(a...)
+		for a do(i, v)
+			a\i = v:string()
+		end
+		lock:write()
+		io.stdout:write(a:join(" ").."\n")
+		io.stdout:flush()
+		lock:read()
 	end
-	io.stdout:write(a:join(" ").."\n")
-	io.stdout:flush()
 end
 
-log = function(a...)
-	for a do(i, v)
-		a\i = v:string()
+log = function
+	lock = sync.channel(1)
+	return function(a...)
+		a:shove(time.now():format(time.YMDHIS))
+		for a do(i, v)
+			a\i = v:string()
+		end
+		lock:write()
+		io.stderr:write(a:join(" ").."\n")
+		io.stderr:flush()
+		lock:read()
 	end
-	io.stderr:write(a:join(" ").."\n")
-	io.stderr:flush()
-end
+end()
 
 is = function(class, object)
 	proto = getprototype(object)
@@ -39,6 +49,12 @@ is = function(class, object)
 		end
 	end
 	return false
+end
+
+solo = function(fn)
+	g = sync.group()
+	g:run(fn)
+	return g
 end
 
 function()
@@ -232,8 +248,12 @@ function()
 	tick.iterate = function(t)
 		i = 0
 		return do
-			n, i = i, i+1
-			return n, t:read()
+			v = t:read()
+			if v <> nil then
+				n, i = i, i+1
+				return n, v
+			end
+			return nil
 		end
 	end
 
@@ -284,10 +304,6 @@ function()
 		return t:text():json()
 	end
 
-	p.date = function(t)
-		return t:text():split(" "):shift()
-	end
-
 end()
 
 function()
@@ -324,10 +340,10 @@ function()
 		if is, file = io.open(path, "r") then
 			if is, content = file:readall() then
 				file:close()
-				return content:text()
+				return is, content:text()
 			end
 		end
-		return nil
+		return is
 	end
 
 end()
@@ -340,4 +356,5 @@ function()
 			return chan:read()
 		end
 	end
+
 end()

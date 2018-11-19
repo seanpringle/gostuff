@@ -84,21 +84,6 @@ func init() {
 			return args
 		}
 
-		libSQL = NewMap(MapData{
-
-			Text("open"): Func(func(vm *VM, aa *Args) *Args {
-				driver := totext(aa.get(0))
-				connStr := totext(aa.get(1))
-				vm.da(aa)
-				db, err := sql.Open(driver, connStr)
-				if err != nil {
-					return join(vm, NewStatus(err))
-				}
-				return join(vm, NewStatus(err), DBCon{db})
-			}),
-		})
-		Nsql = libSQL
-
 		protoDBCon = NewMap(MapData{
 
 			Text("close"): Func(func(vm *VM, aa *Args) *Args {
@@ -244,5 +229,24 @@ func init() {
 			}),
 		})
 		protoDBRes.meta = protoDef
+
+		libSQL = NewMap(MapData{
+
+			Text("db"): protoDBCon,
+			Text("rs"): protoDBRes,
+			Text("tx"): protoDBTx,
+
+			Text("open"): Func(func(vm *VM, aa *Args) *Args {
+				driver := totext(aa.get(0))
+				connStr := totext(aa.get(1))
+				vm.da(aa)
+				db, err := sql.Open(driver, connStr)
+				if err != nil {
+					return join(vm, NewStatus(err))
+				}
+				return join(vm, NewStatus(err), DBCon{db})
+			}),
+		})
+		Nsql = libSQL
 	})
 }

@@ -13,6 +13,10 @@ import "encoding/hex"
 import "errors"
 import "encoding/json"
 import "regexp"
+import "syscall"
+import "os/signal"
+
+//import "log"
 
 type Any interface {
 	Type() string
@@ -419,11 +423,15 @@ func (t Instant) Lib() Searchable {
 
 type Ticker struct {
 	*time.Ticker
+	stop    chan struct{}
+	stopped bool
 }
 
 func NewTicker(d time.Duration) Ticker {
 	return Ticker{
 		time.NewTicker(d),
+		make(chan struct{}, 1),
+		false,
 	}
 }
 
@@ -444,11 +452,21 @@ func (t Ticker) Lib() Searchable {
 }
 
 func (t Ticker) Read() Any {
-	return Instant(<-t.Ticker.C)
+	if t.stopped {
+		return nil
+	}
+	select {
+	case v := <-t.Ticker.C:
+		return Instant(v)
+	case <-t.stop:
+		return nil
+	}
 }
 
 func (t Ticker) Stop() Any {
 	t.Ticker.Stop()
+	t.stop <- struct{}{}
+	t.stopped = true
 	return nil
 }
 
@@ -1342,6 +1360,12 @@ func init() {
 			vm.da(aa)
 			return join(vm, NewList(keys))
 		}),
+		Text("drop"): Func(func(vm *VM, aa *Args) *Args {
+			m := aa.get(0).(*Map)
+			k := aa.get(1)
+			m.Drop(k)
+			return join(vm, nil)
+		}),
 	})
 	protoMap.meta = protoDef
 
@@ -1401,6 +1425,16 @@ func init() {
 			vm.da(aa)
 			return join(vm, <-c.c)
 		}),
+		Text("check"): Func(func(vm *VM, aa *Args) *Args {
+			c := aa.get(0).(*Chan)
+			vm.da(aa)
+			var v Any
+			select {
+			case v = <-c.c:
+			default:
+			}
+			return join(vm, v)
+		}),
 		Text("write"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			a := aa.get(1)
@@ -1424,6 +1458,7 @@ func init() {
 		}),
 	})
 	protoChan.meta = protoDef
+
 	protoGroup = NewMap(MapData{
 		Text("run"): Func(func(vm *VM, aa *Args) *Args {
 			g := aa.get(0).(*Group)
@@ -1444,17 +1479,21 @@ func init() {
 		}),
 	})
 	protoGroup.meta = protoDef
+
 	protoText = NewMap(MapData{
+
 		Text("blob"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			vm.da(aa)
 			return join(vm, Blob(s))
 		}),
+
 		Text("quote"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			vm.da(aa)
 			return join(vm, Text(fmt.Sprintf("%q", s)))
 		}),
+
 		Text("trim"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			c := totext(ifnil(aa.get(1), Text("")))
@@ -1464,7 +1503,19 @@ func init() {
 			}
 			return join(vm, Text(strings.Trim(s, c)))
 		}),
-		Text("parsejson"): Func(func(vm *VM, aa *Args) *Args {
+
+		Text("parse_time"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			l := totext(aa.get(1))
+			vm.da(aa)
+			t, e := time.Parse(l, s)
+			if e != nil {
+				return join(vm, NewStatus(e))
+			}
+			return join(vm, NewStatus(e), Instant(t))
+		}),
+
+		Text("parse_json"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			vm.da(aa)
 			var m interface{}
@@ -1524,6 +1575,20 @@ func init() {
 			}
 			return join(vm, nil)
 		}),
+
+		Text("prefixed"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			p := totext(aa.get(1))
+			vm.da(aa)
+			return join(vm, Bool(strings.HasPrefix(s, p)))
+		}),
+
+		Text("suffixed"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			p := totext(aa.get(1))
+			vm.da(aa)
+			return join(vm, Bool(strings.HasPrefix(s, p)))
+		}),
 	})
 	protoText.meta = protoDef
 
@@ -1541,10 +1606,43 @@ func init() {
 	})
 	protoTick.meta = protoDef
 
-	protoInst = protoDef
+	protoInst = NewMap(MapData{
+		Text("year"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Year()))
+		}),
+		Text("month"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Month()))
+		}),
+		Text("day"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Day()))
+		}),
+		Text("hour"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Hour()))
+		}),
+		Text("minute"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Minute()))
+		}),
+		Text("second"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			vm.da(aa)
+			return join(vm, Int(t.Second()))
+		}),
+	})
+	protoInst.meta = protoDef
 
 	libTime = NewMap(MapData{
 		Text("ms"): Int(int64(time.Millisecond)),
+		Text("s"):  Int(int64(time.Second)),
 		Text("now"): Func(func(vm *VM, aa *Args) *Args {
 			vm.da(aa)
 			return join(vm, Instant(time.Now()))
@@ -1559,11 +1657,15 @@ func init() {
 
 	libSync = NewMap(MapData{
 		Text("group"): Func(func(vm *VM, aa *Args) *Args {
+			g := NewGroup()
+			for i := 1; i < aa.len(); i++ {
+				g.Run(aa.get(i).(Func), nil)
+			}
 			vm.da(aa)
-			return join(vm, NewGroup())
+			return join(vm, g)
 		}),
 		Text("channel"): Func(func(vm *VM, aa *Args) *Args {
-			n := int(aa.get(0).(IntIsh).Int())
+			n := int(ifnil(aa.get(0), Int(0)).(IntIsh).Int())
 			vm.da(aa)
 			return join(vm, NewChan(n))
 		}),
@@ -1574,6 +1676,59 @@ func init() {
 		Text("stdin"):  NewStream(os.Stdin),
 		Text("stdout"): NewStream(os.Stdout),
 		Text("stderr"): NewStream(os.Stderr),
+
+		Text("SIGABRT"):   toInt(Int(syscall.SIGABRT)),
+		Text("SIGALRM"):   toInt(Int(syscall.SIGALRM)),
+		Text("SIGBUS"):    toInt(Int(syscall.SIGBUS)),
+		Text("SIGCHLD"):   toInt(Int(syscall.SIGCHLD)),
+		Text("SIGCLD"):    toInt(Int(syscall.SIGCLD)),
+		Text("SIGCONT"):   toInt(Int(syscall.SIGCONT)),
+		Text("SIGFPE"):    toInt(Int(syscall.SIGFPE)),
+		Text("SIGHUP"):    toInt(Int(syscall.SIGHUP)),
+		Text("SIGILL"):    toInt(Int(syscall.SIGILL)),
+		Text("SIGINT"):    toInt(Int(syscall.SIGINT)),
+		Text("SIGIO"):     toInt(Int(syscall.SIGIO)),
+		Text("SIGIOT"):    toInt(Int(syscall.SIGIOT)),
+		Text("SIGKILL"):   toInt(Int(syscall.SIGKILL)),
+		Text("SIGPIPE"):   toInt(Int(syscall.SIGPIPE)),
+		Text("SIGPOLL"):   toInt(Int(syscall.SIGPOLL)),
+		Text("SIGPROF"):   toInt(Int(syscall.SIGPROF)),
+		Text("SIGPWR"):    toInt(Int(syscall.SIGPWR)),
+		Text("SIGQUIT"):   toInt(Int(syscall.SIGQUIT)),
+		Text("SIGSEGV"):   toInt(Int(syscall.SIGSEGV)),
+		Text("SIGSTKFLT"): toInt(Int(syscall.SIGSTKFLT)),
+		Text("SIGSTOP"):   toInt(Int(syscall.SIGSTOP)),
+		Text("SIGSYS"):    toInt(Int(syscall.SIGSYS)),
+		Text("SIGTERM"):   toInt(Int(syscall.SIGTERM)),
+		Text("SIGTRAP"):   toInt(Int(syscall.SIGTRAP)),
+		Text("SIGTSTP"):   toInt(Int(syscall.SIGTSTP)),
+		Text("SIGTTIN"):   toInt(Int(syscall.SIGTTIN)),
+		Text("SIGTTOU"):   toInt(Int(syscall.SIGTTOU)),
+		Text("SIGUNUSED"): toInt(Int(syscall.SIGUNUSED)),
+		Text("SIGURG"):    toInt(Int(syscall.SIGURG)),
+		Text("SIGUSR1"):   toInt(Int(syscall.SIGUSR1)),
+		Text("SIGUSR2"):   toInt(Int(syscall.SIGUSR2)),
+		Text("SIGVTALRM"): toInt(Int(syscall.SIGVTALRM)),
+		Text("SIGWINCH"):  toInt(Int(syscall.SIGWINCH)),
+		Text("SIGXCPU"):   toInt(Int(syscall.SIGXCPU)),
+		Text("SIGXFSZ"):   toInt(Int(syscall.SIGXFSZ)),
+
+		Text("signals"): Func(func(vm *VM, aa *Args) *Args {
+			c := NewChan(1)
+			l := []os.Signal{}
+			for i := 0; i < aa.len(); i++ {
+				s := syscall.Signal(aa.get(i).(IntIsh).Int())
+				l = append(l, s)
+			}
+			oc := make(chan os.Signal, 1)
+			signal.Notify(oc, l...)
+			go func() {
+				for sig := range oc {
+					c.c <- toInt(Int(sig.(syscall.Signal)))
+				}
+			}()
+			return join(vm, c)
+		}),
 
 		Text("open"): Func(func(vm *VM, aa *Args) *Args {
 			path := totext(aa.get(0))

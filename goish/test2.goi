@@ -108,6 +108,7 @@ for [1,2,3] function(i, v)
 end
 
 for { tom = 1, dick = 2, harry = 43 } function(k, v)
+
 	print(k, "=>", v)
 end
 
@@ -205,6 +206,9 @@ print("hex", 0xFF)
 
 print()
 print()
+
+print(time.now():year())
+
 
 defer print("deferred!")
 defer print("deferred! 2")
