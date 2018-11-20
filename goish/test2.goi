@@ -108,7 +108,6 @@ for [1,2,3] function(i, v)
 end
 
 for { tom = 1, dick = 2, harry = 43 } function(k, v)
-
 	print(k, "=>", v)
 end
 
@@ -208,6 +207,7 @@ print()
 print()
 
 print(time.now():year())
+print("modulus", 18 % 3 == 0)
 
 
 defer print("deferred!")
@@ -226,6 +226,5 @@ end
 
 print(try do return status(nil), "hello" end())
 print(try do return status("wtf"), "world" end())
-
 
 

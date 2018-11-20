@@ -1425,15 +1425,16 @@ func init() {
 			vm.da(aa)
 			return join(vm, <-c.c)
 		}),
-		Text("check"): Func(func(vm *VM, aa *Args) *Args {
+		Text("nb_read"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
 			vm.da(aa)
 			var v Any
 			select {
 			case v = <-c.c:
+				return join(vm, NewStatus(nil), v)
 			default:
+				return join(vm, NewStatus(errors.New("non-blocking read failed")))
 			}
-			return join(vm, v)
 		}),
 		Text("write"): Func(func(vm *VM, aa *Args) *Args {
 			c := aa.get(0).(*Chan)
@@ -1446,6 +1447,26 @@ func init() {
 					}
 				}()
 				c.c <- a
+				return
+			}()
+			return join(vm, NewStatus(rs))
+		}),
+		Text("nb_write"): Func(func(vm *VM, aa *Args) *Args {
+			c := aa.get(0).(*Chan)
+			a := aa.get(1)
+			vm.da(aa)
+			rs := func() (err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = errors.New("channel closed")
+					}
+				}()
+				select {
+				case c.c <- a:
+					err = nil
+				default:
+					err = errors.New("non-blocking write failed")
+				}
 				return
 			}()
 			return join(vm, NewStatus(rs))

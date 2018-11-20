@@ -20,7 +20,7 @@ print = function(a...)
 		io.stdout:flush()
 		lock:read()
 	end
-end
+end()
 
 log = function
 	lock = sync.channel(1)

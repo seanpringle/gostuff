@@ -1433,7 +1433,7 @@ func init() {
 			case v = <-c.c:
 				return join(vm, NewStatus(nil), v)
 			default:
-				return join(vm, NewStatus(error.New("non-blocking read failed")))
+				return join(vm, NewStatus(errors.New("non-blocking read failed")))
 			}
 		}),
 		Text("write"): Func(func(vm *VM, aa *Args) *Args {
@@ -1465,7 +1465,7 @@ func init() {
 				case c.c <- a:
 					err = nil
 				default:
-					err = NewStatus(errors.New("non-blocking write failed"))
+					err = errors.New("non-blocking write failed")
 				}
 				return
 			}()
