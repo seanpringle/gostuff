@@ -1637,6 +1637,12 @@ func init() {
 			vm.da(aa)
 			return join(vm, Int(t.Second()))
 		}),
+		Text("format"): Func(func(vm *VM, aa *Args) *Args {
+			t := time.Time(aa.get(0).(Instant))
+			l := totext(aa.get(1))
+			vm.da(aa)
+			return join(vm, Text(t.Format(l)))
+		}),
 	})
 	protoInst.meta = protoDef
 
@@ -1652,15 +1658,25 @@ func init() {
 			vm.da(aa)
 			return join(vm, NewTicker(time.Duration(d)))
 		}),
+
+		Text("ANSIC"):       Text(time.ANSIC),       // = "Mon Jan _2 15:04:05 2006"
+		Text("UnixDate"):    Text(time.UnixDate),    // = "Mon Jan _2 15:04:05 MST 2006"
+		Text("RFC822"):      Text(time.RFC822),      // = "02 Jan 06 15:04 MST"
+		Text("RFC822Z"):     Text(time.RFC822Z),     // = "02 Jan 06 15:04 -0700" // RFC822 with numeric zone
+		Text("RFC850"):      Text(time.RFC850),      // = "Monday, 02-Jan-06 15:04:05 MST"
+		Text("RFC1123"):     Text(time.RFC1123),     // = "Mon, 02 Jan 2006 15:04:05 MST"
+		Text("RFC1123Z"):    Text(time.RFC1123Z),    // = "Mon, 02 Jan 2006 15:04:05 -0700" // RFC1123 with numeric zone
+		Text("RFC3339"):     Text(time.RFC3339),     // = "2006-01-02T15:04:05Z07:00"
+		Text("RFC3339Nano"): Text(time.RFC3339Nano), // = "2006-01-02T15:04:05.999999999Z07:00"
+		Text("Kitchen"):     Text(time.Kitchen),     // = "3:04PM"
+		Text("YMD"):         Text("2006-01-02"),
+		Text("YMDHIS"):      Text("2006-01-02 15:04:05-07"),
 	})
 	Ntime = libTime
 
 	libSync = NewMap(MapData{
 		Text("group"): Func(func(vm *VM, aa *Args) *Args {
 			g := NewGroup()
-			for i := 1; i < aa.len(); i++ {
-				g.Run(aa.get(i).(Func), nil)
-			}
 			vm.da(aa)
 			return join(vm, g)
 		}),
