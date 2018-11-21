@@ -7,6 +7,7 @@ import "sync"
 import "time"
 import "os"
 import "sort"
+import "path"
 import "io"
 import "io/ioutil"
 import "encoding/hex"
@@ -1327,6 +1328,11 @@ func init() {
 			vm.da(aa)
 			return join(vm, i.Dec())
 		}),
+		Text("epoch"): Func(func(vm *VM, aa *Args) *Args {
+			i := aa.get(0).(IntIsh).Int()
+			vm.da(aa)
+			return join(vm, Instant(time.Unix(int64(i), 0)))
+		}),
 	})
 	protoInt.meta = protoDef
 
@@ -1609,6 +1615,18 @@ func init() {
 			p := totext(aa.get(1))
 			vm.da(aa)
 			return join(vm, Bool(strings.HasPrefix(s, p)))
+		}),
+
+		Text("basename"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(path.Base(s)))
+		}),
+
+		Text("dirname"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(path.Dir(s)))
 		}),
 	})
 	protoText.meta = protoDef
