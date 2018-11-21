@@ -1,6 +1,6 @@
 super   = getprototype(nil)
 integer = getprototype(0)
-decimal = getprototype(0)
+decimal = getprototype(0.0)
 string  = getprototype("")
 list    = getprototype([])
 map     = getprototype({})
