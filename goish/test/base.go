@@ -7,6 +7,7 @@ import "sync"
 import "time"
 import "os"
 import "sort"
+import "path"
 import "io"
 import "io/ioutil"
 import "encoding/hex"
@@ -1078,7 +1079,7 @@ func catch(vm *VM, f Any) {
 		case Any:
 			a = r.(Any)
 		default:
-			a = NewStatus(errors.New("unknown error"))
+			a = NewStatus(fmt.Errorf("caught: %v", r))
 		}
 		aa := vm.ga(1)
 		aa.set(0, a)
@@ -1116,7 +1117,7 @@ func field(t Any, key Any) Any {
 		if l, is := t.(*List); is {
 			return l.Get(key)
 		}
-		panic(fmt.Sprintf("invalid retrieve operation: %v", t))
+		panic(fmt.Errorf("invalid retrieve operation: %v", t))
 	}
 	return nil
 }
@@ -1135,7 +1136,7 @@ func store(t Any, key Any, val Any) Any {
 			l.Set(key, val)
 			return val
 		}
-		panic(fmt.Sprintf("invalid store operation: %v", t))
+		panic(fmt.Errorf("invalid store operation: %v", t))
 	}
 	return val
 }
@@ -1144,7 +1145,7 @@ func iterate(o Any) Func {
 	if oi := trymethod(o, "iterate", nil); oi != nil {
 		return oi.(Func)
 	}
-	panic(fmt.Sprintf("not iterable: %v", o))
+	panic(fmt.Errorf("not iterable: %v", o))
 }
 
 type loopBroke int
@@ -1270,7 +1271,7 @@ var Nsetprototype Any = Func(func(vm *VM, aa *Args) *Args {
 		aa.set(0, l.(Any))
 		return aa
 	}
-	panic(fmt.Sprintf("cannot set prototype"))
+	panic(fmt.Errorf("cannot set prototype"))
 })
 
 var Ngetprototype Any = Func(func(vm *VM, aa *Args) *Args {
@@ -1326,6 +1327,11 @@ func init() {
 			i := aa.get(0).(IntIsh).Int()
 			vm.da(aa)
 			return join(vm, i.Dec())
+		}),
+		Text("epoch"): Func(func(vm *VM, aa *Args) *Args {
+			i := aa.get(0).(IntIsh).Int()
+			vm.da(aa)
+			return join(vm, Instant(time.Unix(int64(i), 0)))
 		}),
 	})
 	protoInt.meta = protoDef
@@ -1610,6 +1616,18 @@ func init() {
 			vm.da(aa)
 			return join(vm, Bool(strings.HasPrefix(s, p)))
 		}),
+
+		Text("basename"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(path.Base(s)))
+		}),
+
+		Text("dirname"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			vm.da(aa)
+			return join(vm, Text(path.Dir(s)))
+		}),
 	})
 	protoText.meta = protoDef
 
@@ -1785,7 +1803,7 @@ func init() {
 			case "a+":
 				mode = os.O_RDONLY | os.O_CREATE | os.O_APPEND
 			default:
-				panic(fmt.Sprintf("unknown file acces mode: %s", modes))
+				panic(fmt.Errorf("unknown file acces mode: %s", modes))
 			}
 			file, err := os.OpenFile(path, mode, 0644)
 			if err != nil {

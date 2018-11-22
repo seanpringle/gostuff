@@ -29,11 +29,11 @@ func (no *NodeField) Precedence() int {
 }
 
 func (no *NodeField) Format() string {
-	return fmt.Sprintf("field(%s,%s)", no.args[1].Format(), no.args[0].Format())
+	return fmt.Sprintf("field(%s,%s)", FormatOne(no.args[1]), FormatOne(no.args[0]))
 }
 
 func (no *NodeField) FormatStore(val string) string {
-	return fmt.Sprintf("store(%s,%s,%s)", no.args[1].Format(), no.args[0].Format(), val)
+	return fmt.Sprintf("store(%s,%s,%s)", FormatOne(no.args[1]), FormatOne(no.args[0]), val)
 }
 
 func (no *NodeField) String() string {
