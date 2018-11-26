@@ -889,13 +889,21 @@ func eq(a, b Any) bool {
 			return math.Abs(float64(ad.Dec())-float64(bd.Dec())) < 0.000001
 		}
 	}
-	return func() (rs bool) {
+	eq := func() (rs bool) {
 		defer func() {
 			recover()
 		}()
 		rs = a == b
 		return
 	}()
+	if eq {
+		return true
+	}
+	if _, f := method(a, Text("eq")); f != nil {
+		vm := &VM{}
+		return truth(one(vm, call(vm, f.(Func), join(vm, a, b))))
+	}
+	return false
 }
 
 func lt(a, b Any) bool {
@@ -919,7 +927,11 @@ func lt(a, b Any) bool {
 			return strings.Compare(string(as), string(bs)) < 0
 		}
 	}
-	panic(fmt.Errorf("invalid comparison (less): %v %v", a, b))
+	if _, f := method(a, Text("lt")); f != nil {
+		vm := &VM{}
+		return truth(one(vm, call(vm, f.(Func), join(vm, a, b))))
+	}
+	return false
 }
 
 func lte(a, b Any) bool {
@@ -974,6 +986,16 @@ func b_xor(a, b Any) Any {
 		}
 	}
 	panic(fmt.Errorf("invalid XOR: %v %v", a, b))
+}
+
+func b_inv(a Any) Any {
+	if ai, is := isInt(a); is {
+		return toInt(^ai)
+	}
+	if ai, is := a.(IntIsh); is {
+		return toInt(^Int(ai.Int()))
+	}
+	panic(fmt.Errorf("invalid INV: %v", a))
 }
 
 func lshift(a, b Any) Any {

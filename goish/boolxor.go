@@ -29,7 +29,7 @@ func (na *NodeBoolXor) Precedence() int {
 }
 
 func (na *NodeBoolXor) Format() string {
-	return fmt.Sprintf("b_xor(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("b_xor(%s, %s)", FormatOne(na.args[1]), FormatOne(na.args[0]))
 }
 
 func (na *NodeBoolXor) String() string {

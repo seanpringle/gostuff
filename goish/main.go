@@ -134,9 +134,20 @@ func (nl Nodes) String() string {
 }
 
 type Parser struct {
-	src   *bufio.Reader
-	dst   *bufio.Writer
-	queue []rune
+	src     *bufio.Reader
+	dst     *bufio.Writer
+	queue   []rune
+	history []rune
+}
+
+func (p *Parser) track(c rune) {
+}
+
+func (p *Parser) last() rune {
+	if len(p.history) > 0 {
+		return p.history[len(p.history)-1]
+	}
+	return rune(0)
 }
 
 func (p *Parser) output() *bufio.Writer {
@@ -159,7 +170,9 @@ func (p *Parser) read() bool {
 	return false
 }
 
-func (p *Parser) drop() bool {
+func (p *Parser) drop(c rune) bool {
+	p.history = append(p.history, c)
+
 	if len(p.queue) > 0 {
 		p.queue = p.queue[1:]
 		return true
@@ -184,7 +197,7 @@ func (p *Parser) scan() rune {
 			break
 		}
 		if p.iswhite(c) {
-			p.drop()
+			p.drop(c)
 			continue
 		}
 		break
@@ -198,7 +211,7 @@ func (p *Parser) next() rune {
 
 func (p *Parser) take() rune {
 	c := p.char(0)
-	p.drop()
+	p.drop(c)
 	return c
 }
 
@@ -210,7 +223,7 @@ func (p *Parser) peek(s string) bool {
 		}
 	}
 	r := p.char(len(s))
-	return p.iswhite(r) || p.issymbol(r) || r == rune(0)
+	return !p.isname(r) && (p.iswhite(r) || p.issymbol(r) || r == rune(0))
 }
 
 func (p *Parser) dump() string {
@@ -424,6 +437,11 @@ func (p *Parser) node(block *NodeBlock) Node {
 	if p.scan() == '^' {
 		p.take()
 		return NewNodeBoolXor()
+	}
+
+	if p.scan() == '~' {
+		p.take()
+		return NewNodeBoolInv(p.expression(block))
 	}
 
 	if p.scan() == '#' {
@@ -729,11 +747,18 @@ func (p *Parser) node(block *NodeBlock) Node {
 	return nil
 }
 
+var level int = 0
+
 func (p *Parser) expression(block *NodeBlock) Node {
 
 	if p.terminator() {
 		return nil
 	}
+
+	level++
+	defer func() {
+		level--
+	}()
 
 	items := Nodes{}
 	ops := Nodes{}
@@ -754,6 +779,11 @@ func (p *Parser) expression(block *NodeBlock) Node {
 	var last Node
 
 	for node := p.node(block); node != nil; node = p.node(block) {
+
+		//log.Println(level, "---")
+		//log.Println(level, ops)
+		//log.Println(level, items)
+		//log.Println(level, node)
 
 		if ex, is := node.(*NodeExec); is {
 			_, op := last.(Operator)
@@ -776,11 +806,16 @@ func (p *Parser) expression(block *NodeBlock) Node {
 			consuming += op.(Operator).Consumes()
 		}
 
+		//log.Println(level, consuming, len(items), len(ops), p.char(0))
+
 		if consuming > len(items)+len(ops)-1 {
 			continue
 		}
 
-		//if p.scan() == ',' || p.scan() == '{' || p.scan() == '[' || p.terminator() {
+		if p.scan() == '(' && p.iswhite(p.last()) {
+			break
+		}
+
 		if p.scan() == ',' || p.terminator() {
 			break
 		}

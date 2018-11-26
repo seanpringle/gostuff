@@ -1,9 +1,3 @@
-o = { b = { c = function()
-	return {
-		d = function(self)
-			print(self)
-		end
-	}
-end}}
-
-print(o.b.c():d())
+for 10 do(i)
+end
+(1+2)

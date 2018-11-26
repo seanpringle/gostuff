@@ -29,7 +29,7 @@ func (na *NodeBoolOr) Precedence() int {
 }
 
 func (na *NodeBoolOr) Format() string {
-	return fmt.Sprintf("b_or(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("b_or(%s, %s)", FormatOne(na.args[1]), FormatOne(na.args[0]))
 }
 
 func (na *NodeBoolOr) String() string {

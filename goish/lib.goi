@@ -8,6 +8,7 @@ stream  = getprototype(io.stdin)
 true    = 0 < 1
 false   = 1 < 0
 nil     = []:remove(0)
+ok      = status(nil)
 
 print = function(a...)
 	lock = sync.channel(1)
@@ -55,6 +56,14 @@ solo = function(fn)
 	g = sync.group()
 	g:run(fn)
 	return g
+end
+
+test = function(name, fn)
+	catch do(err)
+		log(name, "fail", err)
+	end
+	fn()
+	log(name, "pass")
 end
 
 function()
@@ -263,23 +272,23 @@ function()
 	protoQueue = {
 
 		read = function(q)
-			q.lock:write()
-			job = q.jobs:shift()
-			q.lock:read()
+			(q\0):write()
+			job = (q\1):shift()
+			(q\0):read()
 			return job
 		end,
 
 		write = function(q, fn)
-			q.lock:write()
-			q.jobs:push(fn)
-			q.lock:read()
+			(q\0):write()
+			(q\1):push(fn)
+			(q\0):read()
 		end,
 
 		iterate = function(q)
-			q.lock:write()
-			jobs = q.jobs
-			q.jobs = []
-			q.lock:read()
+			(q\0):write()
+			jobs = (q\1)
+			q\1 = []
+			(q\0):read()
 			return do
 				return jobs:shift()
 			end
@@ -287,12 +296,7 @@ function()
 	}
 
 	sync.queue = function()
-		return setprototype({
-				lock = sync.channel(1),
-				jobs = [],
-			},
-			protoQueue,
-		)
+		return setprototype([sync.channel(1), [] ], protoQueue)
 	end
 
 end()
@@ -311,7 +315,7 @@ function()
 
 	p.readline = function(s)
 		line = []
-		while ok, c = s:readrune() do
+		while np, c = s:readrune() do
 			line:push(c)
 			if not c or c == '\n' then
 				break
@@ -323,7 +327,7 @@ function()
 	p.iterate = function(s)
 		done = false
 		return do
-			if ok, line = s:readline() then
+			if np, line = s:readline() then
 				return line
 			end
 			return nil
@@ -358,3 +362,4 @@ function()
 	end
 
 end()
+

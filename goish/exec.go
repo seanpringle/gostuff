@@ -40,6 +40,10 @@ func (ne *NodeExec) Format() string {
 	return fmt.Sprintf("call(vm, %s, %s)", ne.name.Format(), FormatJoin(args))
 }
 
+func (ne *NodeExec) FormatJoin() string {
+	return ne.Format()
+}
+
 func (ne *NodeExec) String() string {
 	return fmt.Sprintf("NodeExec{%s(%s)}", ne.name, ne.args)
 }

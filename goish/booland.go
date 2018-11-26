@@ -29,7 +29,7 @@ func (na *NodeBoolAnd) Precedence() int {
 }
 
 func (na *NodeBoolAnd) Format() string {
-	return fmt.Sprintf("b_and(%s, %s)", na.args[1].Format(), na.args[0].Format())
+	return fmt.Sprintf("b_and(%s, %s)", FormatOne(na.args[1]), FormatOne(na.args[0]))
 }
 
 func (na *NodeBoolAnd) String() string {

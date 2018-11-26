@@ -209,6 +209,27 @@ print()
 print(time.now():year())
 print("modulus", 18 % 3 == 0)
 
+a = {
+	eq = function(self, other)
+		return true
+	end,
+}
+
+b = {
+	eq = function(self, other)
+		return false
+	end,
+}
+
+print("eq", a == b)
+print("eq", b == a)
+
+print("inv", ~1)
+
+a = [ [ 1, 2, 3 ] ]
+print("len", #a\0)
+
+
 
 defer print("deferred!")
 defer print("deferred! 2")

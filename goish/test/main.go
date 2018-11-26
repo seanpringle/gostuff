@@ -4,65 +4,64 @@ import "log"
 import "runtime/pprof"
 import "os"
 
-const S38 Text = Text("queue")
-const S46 Text = Text("d")
+const S15 Text = Text("group")
+const S17 Text = Text("type")
+const S18 Text = Text("len")
+const S39 Text = Text("open")
+const S41 Text = Text("close")
+const S2 Text = Text("remove")
+const S38 Text = Text("readline")
+const S45 Text = Text("a")
+const S51 Text = Text("harry")
+const S54 Text = Text("sort")
+const S58 Text = Text("eq")
+const S49 Text = Text("wait")
+const S52 Text = Text("tom")
+const S1 Text = Text("stdin")
+const S8 Text = Text("flush")
+const S32 Text = Text("get")
 const S16 Text = Text("run")
-const S21 Text = Text("min")
-const S19 Text = Text("iterate")
 const S20 Text = Text("max")
 const S27 Text = Text("pop")
-const S49 Text = Text("m")
-const S50 Text = Text("split")
-const S55 Text = Text("b")
+const S33 Text = Text("keys")
+const S43 Text = Text("c")
+const S46 Text = Text("g")
+const S48 Text = Text("split")
+const S55 Text = Text("match")
+const S3 Text = Text("channel")
+const S12 Text = Text("format")
+const S29 Text = Text("clear")
+const S31 Text = Text("set")
+const S40 Text = Text("readall")
+const S44 Text = Text("d")
+const S57 Text = Text("year")
+const S9 Text = Text("read")
+const S11 Text = Text("now")
+const S35 Text = Text("stop")
 const S4 Text = Text("string")
 const S5 Text = Text("write")
-const S45 Text = Text("c")
-const S47 Text = Text("a")
-const S48 Text = Text("g")
-const S58 Text = Text("huge")
-const S31 Text = Text("set")
-const S36 Text = Text("lock")
-const S12 Text = Text("format")
-const S44 Text = Text("slurp")
-const S29 Text = Text("clear")
-const S35 Text = Text("stop")
-const S41 Text = Text("open")
-const S8 Text = Text("flush")
-const S34 Text = Text("ticker")
-const S30 Text = Text("extend")
-const S39 Text = Text("readrune")
-const S15 Text = Text("group")
-const S26 Text = Text("push")
-const S33 Text = Text("keys")
-const S10 Text = Text("shove")
 const S28 Text = Text("shift")
-const S57 Text = Text("match")
-const S3 Text = Text("channel")
-const S7 Text = Text("join")
-const S25 Text = Text("insert")
-const S52 Text = Text("tom")
-const S22 Text = Text("text")
-const S23 Text = Text("json")
-const S59 Text = Text("year")
-const S1 Text = Text("stdin")
-const S37 Text = Text("jobs")
-const S32 Text = Text("get")
-const S42 Text = Text("readall")
-const S51 Text = Text("wait")
-const S56 Text = Text("sort")
-const S9 Text = Text("read")
+const S53 Text = Text("b")
 const S13 Text = Text("YMDHIS")
+const S21 Text = Text("min")
+const S25 Text = Text("insert")
+const S34 Text = Text("ticker")
+const S42 Text = Text("slurp")
+const S7 Text = Text("join")
 const S14 Text = Text("stderr")
-const S17 Text = Text("type")
-const S24 Text = Text("quote")
-const S40 Text = Text("readline")
-const S43 Text = Text("close")
-const S53 Text = Text("dick")
+const S19 Text = Text("iterate")
+const S23 Text = Text("json")
+const S22 Text = Text("text")
+const S30 Text = Text("extend")
+const S36 Text = Text("queue")
+const S37 Text = Text("readrune")
 const S6 Text = Text("stdout")
-const S11 Text = Text("now")
-const S54 Text = Text("harry")
-const S2 Text = Text("remove")
-const S18 Text = Text("len")
+const S10 Text = Text("shove")
+const S24 Text = Text("quote")
+const S26 Text = Text("push")
+const S47 Text = Text("m")
+const S50 Text = Text("dick")
+const S56 Text = Text("huge")
 
 func main() {
 
@@ -82,60 +81,64 @@ func main() {
 	vm := &VM{}
 
 	{
-		var Nfalse Any
-		noop(Nfalse)
-		var Nlog Any
-		noop(Nlog)
-		var Nb Any
-		noop(Nb)
-		var Nl Any
-		noop(Nl)
-		var Nf Any
-		noop(Nf)
-		var Nsuper Any
-		noop(Nsuper)
-		var Ninteger Any
-		noop(Ninteger)
-		var Nprint Any
-		noop(Nprint)
-		var Na Any
-		noop(Na)
-		var Nblink Any
-		noop(Nblink)
-		var Ndecimal Any
-		noop(Ndecimal)
-		var Nstream Any
-		noop(Nstream)
-		var Nc Any
-		noop(Nc)
-		var Nhi Any
-		noop(Nhi)
-		var Nt Any
-		noop(Nt)
-		var Ns Any
-		noop(Ns)
-		var Nstring Any
-		noop(Nstring)
-		var Nnil Any
-		noop(Nnil)
-		var Ninc Any
-		noop(Ninc)
-		var Nlen Any
-		noop(Nlen)
-		var Nmap Any
-		noop(Nmap)
-		var Ntrue Any
-		noop(Ntrue)
-		var Nis Any
-		noop(Nis)
-		var Nsolo Any
-		noop(Nsolo)
-		var Nm Any
-		noop(Nm)
 		var Nlist Any
 		noop(Nlist)
+		var Nok Any
+		noop(Nok)
+		var Nt Any
+		noop(Nt)
+		var Nstring Any
+		noop(Nstring)
+		var Nis Any
+		noop(Nis)
+		var Nlen Any
+		noop(Nlen)
 		var Ng Any
 		noop(Ng)
+		var Nprint Any
+		noop(Nprint)
+		var Ndecimal Any
+		noop(Ndecimal)
+		var Nfalse Any
+		noop(Nfalse)
+		var Ntest Any
+		noop(Ntest)
+		var Na Any
+		noop(Na)
+		var Ns Any
+		noop(Ns)
+		var Nc Any
+		noop(Nc)
+		var Nsuper Any
+		noop(Nsuper)
+		var Nsolo Any
+		noop(Nsolo)
+		var Nb Any
+		noop(Nb)
+		var Nhi Any
+		noop(Nhi)
+		var Ntrue Any
+		noop(Ntrue)
+		var Nmap Any
+		noop(Nmap)
+		var Nl Any
+		noop(Nl)
+		var Ninteger Any
+		noop(Ninteger)
+		var Nm Any
+		noop(Nm)
+		var Nnil Any
+		noop(Nnil)
+		var Nlog Any
+		noop(Nlog)
+		var Ninc Any
+		noop(Ninc)
+		var Nblink Any
+		noop(Nblink)
+		var Nf Any
+		noop(Nf)
+		var Nstream Any
+		noop(Nstream)
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Nnil))); Nsuper = a; return a }()
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Int(0)))); Ninteger = a; return a }()
 		func() Any { a := one(vm, call(vm, Ngetprototype, join(vm, Dec(0)))); Ndecimal = a; return a }()
@@ -161,6 +164,7 @@ func main() {
 			Nnil = a
 			return a
 		}()
+		func() Any { a := one(vm, call(vm, Nstatus, join(vm, Nnil))); Nok = a; return a }()
 		func() Any {
 			a := one(vm, call(vm, Func(func(vm *VM, aa *Args) *Args {
 				Na := aa.agg(0)
@@ -384,6 +388,31 @@ func main() {
 				return nil
 			}))
 			Nsolo = a
+			return a
+		}()
+		func() Any {
+			a := one(vm, Func(func(vm *VM, aa *Args) *Args {
+				Nname := aa.get(0)
+				noop(Nname)
+				Nfn := aa.get(1)
+				noop(Nfn)
+				vm.da(aa)
+				{
+					defer catch(vm, Func(func(vm *VM, aa *Args) *Args {
+						Nerr := aa.get(0)
+						noop(Nerr)
+						vm.da(aa)
+						{
+							vm.da(call(vm, Nlog, join(vm, Nname, Text("fail"), Nerr)))
+						}
+						return nil
+					}))
+					vm.da(call(vm, Nfn, join(vm, nil)))
+					vm.da(call(vm, Nlog, join(vm, Nname, Text("pass"))))
+				}
+				return nil
+			}))
+			Ntest = a
 			return a
 		}()
 		vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1270,19 +1299,19 @@ func main() {
 								var Njob Any
 								noop(Njob)
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S5 /* write */)
+									t, m := method(one(vm, field(Nq, Int(0))), S5 /* write */)
 									return call(vm, m, join(vm, t, nil))
 								}())
 								func() Any {
 									a := one(vm, func() *Args {
-										t, m := method(one(vm, find(Nq, S37 /* jobs */)), S28 /* shift */)
+										t, m := method(one(vm, field(Nq, Int(1))), S28 /* shift */)
 										return call(vm, m, join(vm, t, nil))
 									}())
 									Njob = a
 									return a
 								}()
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S9 /* read */)
+									t, m := method(one(vm, field(Nq, Int(0))), S9 /* read */)
 									return call(vm, m, join(vm, t, nil))
 								}())
 								return join(vm, Njob)
@@ -1297,15 +1326,15 @@ func main() {
 							vm.da(aa)
 							{
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S5 /* write */)
+									t, m := method(one(vm, field(Nq, Int(0))), S5 /* write */)
 									return call(vm, m, join(vm, t, nil))
 								}())
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S37 /* jobs */)), S26 /* push */)
+									t, m := method(one(vm, field(Nq, Int(1))), S26 /* push */)
 									return call(vm, m, join(vm, t, Nfn))
 								}())
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S9 /* read */)
+									t, m := method(one(vm, field(Nq, Int(0))), S9 /* read */)
 									return call(vm, m, join(vm, t, nil))
 								}())
 							}
@@ -1319,13 +1348,13 @@ func main() {
 								var Njobs Any
 								noop(Njobs)
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S5 /* write */)
+									t, m := method(one(vm, field(Nq, Int(0))), S5 /* write */)
 									return call(vm, m, join(vm, t, nil))
 								}())
-								func() Any { a := one(vm, find(Nq, S37 /* jobs */)); Njobs = a; return a }()
-								func() Any { a := one(vm, NewList([]Any{})); store(Nq, S37 /* jobs */, a); return a }()
+								func() Any { a := one(vm, field(Nq, Int(1))); Njobs = a; return a }()
+								func() Any { a := one(vm, NewList([]Any{})); store(Nq, Int(1), a); return a }()
 								vm.da(func() *Args {
-									t, m := method(one(vm, find(Nq, S36 /* lock */)), S9 /* read */)
+									t, m := method(one(vm, field(Nq, Int(0))), S9 /* read */)
 									return call(vm, m, join(vm, t, nil))
 								}())
 								return join(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -1348,13 +1377,11 @@ func main() {
 					a := one(vm, Func(func(vm *VM, aa *Args) *Args {
 						vm.da(aa)
 						{
-							return join(vm, call(vm, Nsetprototype, join(vm, NewMap(MapData{
-								S36 /* lock */ : one(vm, call(vm, find(Nsync, S3 /* channel */), join(vm, Int(1)))),
-								S37 /* jobs */ : one(vm, NewList([]Any{}))}), NprotoQueue)))
+							return join(vm, call(vm, Nsetprototype, join(vm, NewList([]Any{one(vm, call(vm, find(Nsync, S3 /* channel */), join(vm, Int(1)))), one(vm, NewList([]Any{}))}), NprotoQueue)))
 						}
 						return nil
 					}))
-					store(Nsync, S38 /* queue */, a)
+					store(Nsync, S36 /* queue */, a)
 					return a
 				}()
 			}
@@ -1406,18 +1433,18 @@ func main() {
 						{
 							var Nline Any
 							noop(Nline)
-							var Nok Any
-							noop(Nok)
+							var Nnp Any
+							noop(Nnp)
 							var Nc Any
 							noop(Nc)
 							func() Any { a := one(vm, NewList([]Any{})); Nline = a; return a }()
 							loop(func() {
 								for truth(one(vm, func() *Args {
 									aa := join(vm, func() *Args {
-										t, m := method(Ns, S39 /* readrune */)
+										t, m := method(Ns, S37 /* readrune */)
 										return call(vm, m, join(vm, t, nil))
 									}())
-									Nok = aa.get(0)
+									Nnp = aa.get(0)
 									Nc = aa.get(1)
 									return aa
 								}())) {
@@ -1452,7 +1479,7 @@ func main() {
 						}
 						return nil
 					}))
-					store(Np, S40 /* readline */, a)
+					store(Np, S38 /* readline */, a)
 					return a
 				}()
 				func() Any {
@@ -1461,22 +1488,22 @@ func main() {
 						noop(Ns)
 						vm.da(aa)
 						{
-							var Nok Any
-							noop(Nok)
-							var Nline Any
-							noop(Nline)
 							var Ndone Any
 							noop(Ndone)
+							var Nnp Any
+							noop(Nnp)
+							var Nline Any
+							noop(Nline)
 							func() Any { a := Nfalse; Ndone = a; return a }()
 							return join(vm, Func(func(vm *VM, aa *Args) *Args {
 								vm.da(aa)
 								{
 									if truth(one(vm, func() *Args {
 										aa := join(vm, func() *Args {
-											t, m := method(Ns, S40 /* readline */)
+											t, m := method(Ns, S38 /* readline */)
 											return call(vm, m, join(vm, t, nil))
 										}())
-										Nok = aa.get(0)
+										Nnp = aa.get(0)
 										Nline = aa.get(1)
 										return aa
 									}())) {
@@ -1516,7 +1543,7 @@ func main() {
 							var Ncontent Any
 							noop(Ncontent)
 							if truth(one(vm, func() *Args {
-								aa := join(vm, call(vm, find(Nio, S41 /* open */), join(vm, Npath, Text("r"))))
+								aa := join(vm, call(vm, find(Nio, S39 /* open */), join(vm, Npath, Text("r"))))
 								Nis = aa.get(0)
 								Nfile = aa.get(1)
 								return aa
@@ -1524,7 +1551,7 @@ func main() {
 								{
 									if truth(one(vm, func() *Args {
 										aa := join(vm, func() *Args {
-											t, m := method(Nfile, S42 /* readall */)
+											t, m := method(Nfile, S40 /* readall */)
 											return call(vm, m, join(vm, t, nil))
 										}())
 										Nis = aa.get(0)
@@ -1533,7 +1560,7 @@ func main() {
 									}())) {
 										{
 											vm.da(func() *Args {
-												t, m := method(Nfile, S43 /* close */)
+												t, m := method(Nfile, S41 /* close */)
 												return call(vm, m, join(vm, t, nil))
 											}())
 											return join(vm, Nis, func() *Args {
@@ -1548,7 +1575,7 @@ func main() {
 						}
 						return nil
 					}))
-					store(Np, S44 /* slurp */, a)
+					store(Np, S42 /* slurp */, a)
 					return a
 				}()
 			}
@@ -1650,21 +1677,21 @@ func main() {
 		}())))
 		func() Any {
 			a := one(vm, NewMap(MapData{
-				S45 /* c */ : one(vm, NewMap(MapData{
-					S46 /* d */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+				S43 /* c */ : one(vm, NewMap(MapData{
+					S44 /* d */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
 						vm.da(aa)
 						{
 							return join(vm, Text("hello world"))
 						}
 						return nil
 					}))})),
-				S47 /* a */ :  Int(1),
+				S45 /* a */ :  Int(1),
 				Text("__*&^"): Int(2)}))
 			Nt = a
 			return a
 		}()
-		vm.da(call(vm, Nprint, join(vm, call(vm, find(one(vm, find(Nt, S45 /* c */)), S46 /* d */), join(vm, nil)))))
-		func() Any { a := Int(42); store(Nt, S47 /* a */, a); return a }()
+		vm.da(call(vm, Nprint, join(vm, call(vm, find(one(vm, find(Nt, S43 /* c */)), S44 /* d */), join(vm, nil)))))
+		func() Any { a := Int(42); store(Nt, S45 /* a */, a); return a }()
 		vm.da(call(vm, Nprint, join(vm, Nt)))
 		vm.da(call(vm, Nprint, join(vm, Text(""), func() *Args {
 			t, m := method(Nt, S33 /* keys */)
@@ -1673,7 +1700,7 @@ func main() {
 		vm.da(call(vm, Nprint, join(vm, add(one(vm, mul(Int(2), Int(2))), Int(3)))))
 		func() Any {
 			a := one(vm, NewMap(MapData{
-				S48 /* g */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+				S46 /* g */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
 					vm.da(aa)
 					{
 						return join(vm, Text("hello world"))
@@ -1690,17 +1717,17 @@ func main() {
 				vm.da(aa)
 				{
 					return join(vm, func() *Args {
-						t, m := method(Nself, S48 /* g */)
+						t, m := method(Nself, S46 /* g */)
 						return call(vm, m, join(vm, t, nil))
 					}())
 				}
 				return nil
 			}))
-			store(Nt, S49 /* m */, a)
+			store(Nt, S47 /* m */, a)
 			return a
 		}()
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(Nt, S49 /* m */)
+			t, m := method(Nt, S47 /* m */)
 			return call(vm, m, join(vm, t, nil))
 		}())))
 		func() Any { a := Text("goodbye world"); Ns = a; return a }()
@@ -1756,12 +1783,12 @@ func main() {
 			return call(vm, m, join(vm, t, nil))
 		}())))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(Text("a,b,c"), S50 /* split */)
+			t, m := method(Text("a,b,c"), S48 /* split */)
 			return call(vm, m, join(vm, t, Text(",")))
 		}())))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
 			t, m := method(one(vm, func() *Args {
-				t, m := method(Text("a,b,c"), S50 /* split */)
+				t, m := method(Text("a,b,c"), S48 /* split */)
 				return call(vm, m, join(vm, t, Text(",")))
 			}()), S7 /* join */)
 			return call(vm, m, join(vm, t, Text(":")))
@@ -1818,7 +1845,7 @@ func main() {
 			return call(vm, m, join(vm, t, Nhi))
 		}())
 		vm.da(func() *Args {
-			t, m := method(Ng, S51 /* wait */)
+			t, m := method(Ng, S49 /* wait */)
 			return call(vm, m, join(vm, t, nil))
 		}())
 		vm.da(call(vm, Nprint, join(vm, Text("done"))))
@@ -1887,9 +1914,9 @@ func main() {
 		})
 		loop(func() {
 			it := iterate(one(vm, NewMap(MapData{
-				S52 /* tom */ :   Int(1),
-				S53 /* dick */ :  Int(2),
-				S54 /* harry */ : Int(43)})))
+				S50 /* dick */ :  Int(2),
+				S51 /* harry */ : Int(43),
+				S52 /* tom */ :   Int(1)})))
 			for {
 				aa := it(vm, nil)
 				if aa.get(0) == nil {
@@ -1937,7 +1964,7 @@ func main() {
 				}), aa))
 			}
 		})
-		func() Any { a := one(vm, call(vm, find(Nsync, S38 /* queue */), join(vm, nil))); Nblink = a; return a }()
+		func() Any { a := one(vm, call(vm, find(Nsync, S36 /* queue */), join(vm, nil))); Nblink = a; return a }()
 		vm.da(func() *Args {
 			t, m := method(Nblink, S5 /* write */)
 			return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
@@ -1992,9 +2019,9 @@ func main() {
 		vm.da(call(vm, Nprint, join(vm, field(Nl, Int(0)))))
 		func() Any {
 			a := one(vm, NewMap(MapData{
-				S47 /* a */ : Int(1),
-				S55 /* b */ : one(vm, NewMap(MapData{
-					S45 /* c */ : Int(4)}))}))
+				S45 /* a */ : Int(1),
+				S53 /* b */ : one(vm, NewMap(MapData{
+					S43 /* c */ : Int(4)}))}))
 			Nm = a
 			return a
 		}()
@@ -2007,7 +2034,7 @@ func main() {
 			return call(vm, m, join(vm, t, Int(2)))
 		}())))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(one(vm, NewList([]Any{Int(2), Int(4), Int(6), Int(8), Int(3)})), S56 /* sort */)
+			t, m := method(one(vm, NewList([]Any{Int(2), Int(4), Int(6), Int(8), Int(3)})), S54 /* sort */)
 			return call(vm, m, join(vm, t, Func(func(vm *VM, aa *Args) *Args {
 				Na := aa.get(0)
 				noop(Na)
@@ -2026,11 +2053,11 @@ line
 string
 `))))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(Text("abc"), S57 /* match */)
+			t, m := method(Text("abc"), S55 /* match */)
 			return call(vm, m, join(vm, t, Text("[aeiou]")))
 		}())))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(Text("abc"), S57 /* match */)
+			t, m := method(Text("abc"), S55 /* match */)
 			return call(vm, m, join(vm, t, Text("[aeiou]")))
 		}())))
 		vm.da(call(vm, Func(func(vm *VM, aa *Args) *Args {
@@ -2040,8 +2067,8 @@ string
 			}
 			return nil
 		}), join(vm, nil)))
-		vm.da(call(vm, Nprint, join(vm, find(one(vm, call(vm, Ngetprototype, join(vm, Int(0)))), S58 /* huge */))))
-		vm.da(call(vm, Nprint, join(vm, find(one(vm, call(vm, Ngetprototype, join(vm, Dec(1)))), S58 /* huge */))))
+		vm.da(call(vm, Nprint, join(vm, find(one(vm, call(vm, Ngetprototype, join(vm, Int(0)))), S56 /* huge */))))
+		vm.da(call(vm, Nprint, join(vm, find(one(vm, call(vm, Ngetprototype, join(vm, Dec(1)))), S56 /* huge */))))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
 			t, m := method(one(vm, NewList([]Any{})), S30 /* extend */)
 			return call(vm, m, join(vm, t, Int(3)))
@@ -2079,7 +2106,7 @@ string
 		}(), Nl)))
 		func() Any {
 			a := one(vm, NewMap(MapData{
-				S55 /* b */ : one(vm, NewList([]Any{Int(1), Int(2), Int(3)}))}))
+				S53 /* b */ : one(vm, NewList([]Any{Int(1), Int(2), Int(3)}))}))
 			Na = a
 			return a
 		}()
@@ -2088,13 +2115,13 @@ string
 			var a Any
 			a = one(vm, func() Any {
 				a := one(vm, NewMap(MapData{
-					S55 /* b */ : Int(1)}))
+					S53 /* b */ : Int(1)}))
 				Na = a
 				return a
 			}())
 			if truth(a) {
 				var b Any
-				b = Bool(eq(one(vm, find(Na, S55 /* b */)), Int(1)))
+				b = Bool(eq(one(vm, find(Na, S53 /* b */)), Int(1)))
 				if truth(b) {
 					return b
 				}
@@ -2124,10 +2151,51 @@ string
 		vm.da(call(vm, Nprint, join(vm, nil)))
 		vm.da(call(vm, Nprint, join(vm, nil)))
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
-			t, m := method(one(vm, call(vm, find(Ntime, S11 /* now */), join(vm, nil))), S59 /* year */)
+			t, m := method(one(vm, call(vm, find(Ntime, S11 /* now */), join(vm, nil))), S57 /* year */)
 			return call(vm, m, join(vm, t, nil))
 		}())))
 		vm.da(call(vm, Nprint, join(vm, Text("modulus"), Bool(eq(one(vm, mod(Int(18), Int(3))), Int(0))))))
+		func() Any {
+			a := one(vm, NewMap(MapData{
+				S58 /* eq */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+					Nself := aa.get(0)
+					noop(Nself)
+					Nother := aa.get(1)
+					noop(Nother)
+					vm.da(aa)
+					{
+						return join(vm, Ntrue)
+					}
+					return nil
+				}))}))
+			Na = a
+			return a
+		}()
+		func() Any {
+			a := one(vm, NewMap(MapData{
+				S58 /* eq */ : one(vm, Func(func(vm *VM, aa *Args) *Args {
+					Nself := aa.get(0)
+					noop(Nself)
+					Nother := aa.get(1)
+					noop(Nother)
+					vm.da(aa)
+					{
+						return join(vm, Nfalse)
+					}
+					return nil
+				}))}))
+			Nb = a
+			return a
+		}()
+		vm.da(call(vm, Nprint, join(vm, Text("eq"), Bool(eq(Na, Nb)))))
+		vm.da(call(vm, Nprint, join(vm, Text("eq"), Bool(eq(Nb, Na)))))
+		vm.da(call(vm, Nprint, join(vm, Text("inv"), b_inv(Int(1)))))
+		func() Any {
+			a := one(vm, NewList([]Any{one(vm, NewList([]Any{Int(1), Int(2), Int(3)}))}))
+			Na = a
+			return a
+		}()
+		vm.da(call(vm, Nprint, join(vm, Text("len"), length(field(Na, Int(0))))))
 		defer func() { call(vm, Nprint, join(vm, Text("deferred!"))) }()
 		defer func() { call(vm, Nprint, join(vm, Text("deferred! 2"))) }()
 		loop(func() {
@@ -2151,8 +2219,8 @@ string
 		})
 		vm.da(call(vm, Nprint, join(vm, func() *Args {
 			t, m := method(one(vm, NewMap(MapData{
-				S47 /* a */ : one(vm, NewMap(MapData{
-					S55 /* b */ : one(vm, NewList([]Any{Int(1), Int(2), Int(3)}))}))})), S23 /* json */)
+				S45 /* a */ : one(vm, NewMap(MapData{
+					S53 /* b */ : one(vm, NewList([]Any{Int(1), Int(2), Int(3)}))}))})), S23 /* json */)
 			return call(vm, m, join(vm, t, nil))
 		}())))
 		defer catch(vm, Func(func(vm *VM, aa *Args) *Args {

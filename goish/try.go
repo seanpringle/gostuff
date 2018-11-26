@@ -13,7 +13,7 @@ func NewNodeTry(node Node) *NodeTry {
 }
 
 func (nd *NodeTry) Format() string {
-	return fmt.Sprintf("try(vm, %s)", nd.fn.Format())
+	return fmt.Sprintf("try(vm, %s)", FormatJoin(nd.fn))
 }
 
 func (nd *NodeTry) String() string {

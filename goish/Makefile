@@ -6,7 +6,7 @@ all:
 bug:
 	rm -f test/*.go
 	cp base.go.tpl test/base.go
-	go build && cat test.goi | ./goish | gofmt > test/main.go && cd test && go run main.go
+	go build && cat test.goi | ./goish | gofmt > test/main.go && cd test && go run *.go
 
 web:
 	rm -f test/*.go
@@ -23,6 +23,9 @@ db:
 
 fib:
 	cat lib.goi fib.goi | ./goish | gofmt > test/main.go
+
+sim:
+	cat lib.goi sim.goi | ./goish | gofmt > test/main.go && cd test && go run *.go
 
 benchmark-build:
 	go build bench.go
