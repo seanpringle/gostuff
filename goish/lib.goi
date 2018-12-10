@@ -52,9 +52,11 @@ is = function(class, object)
 	return false
 end
 
-solo = function(fn)
+sync.run = function(fn...)
 	g = sync.group()
-	g:run(fn)
+	for fn do(i, f)
+		g:run(f)
+	end
 	return g
 end
 

@@ -1553,6 +1553,14 @@ func init() {
 			return join(vm, Text(strings.Trim(s, c)))
 		}),
 
+		Text("replace"): Func(func(vm *VM, aa *Args) *Args {
+			s := totext(aa.get(0))
+			p := totext(aa.get(1))
+			r := totext(aa.get(2))
+			vm.da(aa)
+			return join(vm, Text(strings.Replace(s, p, r, -1)))
+		}),
+
 		Text("parse_time"): Func(func(vm *VM, aa *Args) *Args {
 			s := totext(aa.get(0))
 			l := totext(aa.get(1))
